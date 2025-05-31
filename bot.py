@@ -82,6 +82,26 @@ async def check_runtime():
             
         await asyncio.sleep(10)  # Check every 10 seconds
 
+@bot.command(name="forcesync")
+@commands.is_owner()
+async def force_sync(ctx):
+    """Force sync application commands to Discord"""
+    await ctx.send("Syncing commands...")
+    
+    try:
+        # Clear all existing commands first
+        bot.tree.clear_commands(guild=None)
+        
+        # Re-register PnW commands
+        pnw_commands.setup(bot)
+        
+        # Sync commands
+        await bot.tree.sync()
+        
+        await ctx.send("Commands synced successfully!")
+    except Exception as e:
+        await ctx.send(f"Error syncing commands: {str(e)}")
+
 @bot.command()
 @commands.is_owner()
 async def sync(ctx):
@@ -125,6 +145,17 @@ async def on_ready():
     print(f'[{current_time}] {bot.user} has connected to Discord!')
     print(f'[{current_time}] Bot is in {len(bot.guilds)} servers')
     
+    print(f'Logged in as {bot.user} (ID: {bot.user.id})')
+    print('------')
+    
+    # List all registered commands
+    print("Registered global commands:")
+    for command in bot.tree.get_commands():
+        print(f"- {command.name}")
+        if hasattr(command, 'commands'):
+            for subcommand in command.commands:
+                print(f"  - {subcommand.name}")
+                
     # Sync commands with Discord
     try:
         synced = await bot.tree.sync()
@@ -259,14 +290,14 @@ async def help_command(interaction: discord.Interaction):
     embed.add_field(
         name="Politics & War Commands",
         value=(
-            "`/pnw_nation [nation_name]` - Look up a nation\n"
-            "`/pnw_alliance [alliance_name]` - Look up an alliance\n"
-            "`/pnw_wars [nation_name]` - Look up active wars for a nation\n"
-            "`/pnw_city [nation_name] [city_name]` - Look up city information\n"
-            "`/pnw_prices` - Check current trade prices\n"
-            "`/pnw_bank [nation_name]` - View a nation's bank\n"
-            "`/pnw_radiation` - Check global radiation levels\n"
-            "`/pnw_setapikey [api_key]` - Set your P&W API key (admin only)"
+            "`/pnw nation [nation_name]` - Look up a nation\n"
+            "`/pnw alliance [alliance_name]` - Look up an alliance\n"
+            "`/pnw wars [nation_name]` - Look up active wars for a nation\n"
+            "`/pnw city [nation_name] [city_name]` - Look up city information\n"
+            "`/pnw prices` - Check current trade prices\n"
+            "`/pnw bank [nation_name]` - View a nation's bank\n"
+            "`/pnw radiation` - Check global radiation levels\n"
+            "`/pnw setapikey [api_key]` - Set your P&W API key (admin only)"
         ),
         inline=False
     )
