@@ -699,39 +699,44 @@ async def radiation_command(interaction: discord.Interaction):
         
         result = await query.get()
         
-        if not result.game_info or not result.game_info.radiation:
+        if not result.game_info:
             await interaction.followup.send("Could not retrieve radiation data.")
             return
         
-        # Use safe_get to handle different data structures
-        radiation_data = safe_get(result.game_info, "radiation")
+        # Debug information
+        print(f"Debug - game_info type: {type(result.game_info)}")
+        if hasattr(result.game_info, 'radiation'):
+            print(f"Debug - radiation type: {type(result.game_info.radiation)}")
+            print(f"Debug - radiation content: {result.game_info.radiation}")
+        
+        # Get radiation data safely
         radiation = None
         
-        # Try different ways to access the global radiation value
-        if radiation_data:
-            # Try attribute access first
-            try:
-                radiation = getattr(radiation_data, "global")
-            except (AttributeError, TypeError):
-                # Try dictionary access
-                try:
-                    radiation = radiation_data["global"]
-                except (KeyError, TypeError):
-                    # If it's a list, try the first item
-                    if isinstance(radiation_data, list) and len(radiation_data) > 0:
-                        first_item = radiation_data[0]
-                        try:
-                            radiation = getattr(first_item, "global")
-                        except (AttributeError, TypeError):
-                            try:
-                                radiation = first_item["global"]
-                            except (KeyError, TypeError):
-                                radiation = None
+        # Try different ways to access the radiation data
+        if hasattr(result.game_info, 'radiation'):
+            radiation_data = result.game_info.radiation
+            
+            # Case 1: radiation is a list
+            if isinstance(radiation_data, list):
+                if radiation_data:  # Non-empty list
+                    first_item = radiation_data[0]
+                    # Try to get 'global' from the first item
+                    if hasattr(first_item, 'global'):
+                        radiation = getattr(first_item, 'global')
+                    elif isinstance(first_item, dict) and 'global' in first_item:
+                        radiation = first_item['global']
+            
+            # Case 2: radiation is an object with 'global' attribute
+            elif hasattr(radiation_data, 'global'):
+                radiation = getattr(radiation_data, 'global')
+            
+            # Case 3: radiation is a dictionary with 'global' key
+            elif isinstance(radiation_data, dict) and 'global' in radiation_data:
+                radiation = radiation_data['global']
         
         if radiation is None:
             # Last resort - try to parse the raw data
-            print(f"Debug - Radiation data structure: {type(radiation_data)}")
-            print(f"Debug - Radiation data content: {radiation_data}")
+            print(f"Debug - Could not parse radiation data")
             await interaction.followup.send("Could not parse radiation data. Please check the logs.")
             return
         
@@ -744,19 +749,22 @@ async def radiation_command(interaction: discord.Interaction):
         
         # Add effects based on radiation level
         effects = ""
-        radiation_value = float(radiation)
-        if radiation_value < 1:
-            effects = "No significant effects."
-        elif radiation_value < 10:
-            effects = "Minor reduction in food production."
-        elif radiation_value < 25:
-            effects = "Moderate reduction in food production and population growth."
-        elif radiation_value < 50:
-            effects = "Significant reduction in food production, population growth, and soldier recruitment."
-        elif radiation_value < 75:
-            effects = "Severe reduction in food production, population growth, and soldier recruitment. Increased casualties in war."
-        else:
-            effects = "Catastrophic reduction in food production, population growth, and soldier recruitment. Greatly increased casualties in war."
+        try:
+            radiation_value = float(radiation)
+            if radiation_value < 1:
+                effects = "No significant effects."
+            elif radiation_value < 10:
+                effects = "Minor reduction in food production."
+            elif radiation_value < 25:
+                effects = "Moderate reduction in food production and population growth."
+            elif radiation_value < 50:
+                effects = "Significant reduction in food production, population growth, and soldier recruitment."
+            elif radiation_value < 75:
+                effects = "Severe reduction in food production, population growth, and soldier recruitment. Increased casualties in war."
+            else:
+                effects = "Catastrophic reduction in food production, population growth, and soldier recruitment. Greatly increased casualties in war."
+        except (ValueError, TypeError):
+            effects = "Unable to determine effects due to data format issues."
         
         embed.add_field(name="Effects", value=effects, inline=False)
         
@@ -764,6 +772,9 @@ async def radiation_command(interaction: discord.Interaction):
     except Exception as e:
         error_message = f"Error looking up radiation: {str(e)}"
         print(f"Debug - Radiation command error: {error_message}")
+        # Print full traceback for debugging
+        import traceback
+        print(traceback.format_exc())
         await interaction.followup.send(error_message)
 
 
