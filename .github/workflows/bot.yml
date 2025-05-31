@@ -10,13 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v2
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v2
         with:
           python-version: '3.10'
-          cache: 'pip'
 
       - name: Install dependencies
         run: |
@@ -27,13 +26,25 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
+          touch bot_log.txt  # Ensure log file exists even if bot doesn't create it
           python bot.py
         timeout-minutes: 350  # GitHub Actions has a 6-hour (360 minute) limit
 
+      # Simplified artifact upload
       - name: Upload logs
-        if: always()  # Upload logs even if the bot crashes
-        uses: actions/upload-artifact@v2  # Changed from v3 to v2
+        if: always()
+        run: |
+          if [ -f bot_log.txt ]; then
+            mkdir -p logs
+            cp bot_log.txt logs/
+          else
+            echo "No log file found" > logs/no_logs.txt
+          fi
+        
+      - name: Archive logs
+        if: always()
+        uses: actions/upload-artifact@v2
         with:
           name: bot-logs
-          path: bot_log.txt
-          retention-days: 7
+          path: logs/
+          retention-days: 5
