@@ -1,0 +1,11 @@
+{
+    "guilds": {
+        "1366468773082697891": {
+            "welcome_message": "Welcome {user} to the bottesting server!",
+            "settings_viewed": 1,
+            "hello_count": 1,
+            "theme_color": "#abc0e9",
+            "uptime_checks": 1
+        }
+    }
+}
