@@ -436,7 +436,8 @@ async def radiation_command(interaction: discord.Interaction):
             await interaction.followup.send("Could not retrieve radiation data.")
             return
         
-        radiation = result.game_info.radiation.global
+        # Use getattr to access the 'global' property since it's a reserved keyword
+        radiation = getattr(result.game_info.radiation, "global")
         
         # Create embed
         embed = discord.Embed(
@@ -465,7 +466,6 @@ async def radiation_command(interaction: discord.Interaction):
         await interaction.followup.send(embed=embed)
     except Exception as e:
         await interaction.followup.send(f"Error looking up radiation: {str(e)}")
-
 # Set API key command
 @app_commands.command(name="setapikey", description="Set your Politics & War API key")
 @app_commands.describe(api_key="Your Politics & War API key")
