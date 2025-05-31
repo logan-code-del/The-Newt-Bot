@@ -6,6 +6,7 @@ import json
 import datetime
 import asyncio
 import discord
+import pnw_commands
 from discord import app_commands
 from discord.ext import commands
 
@@ -87,13 +88,15 @@ async def setup_hook():
     # Start the runtime check task
     bot.loop.create_task(check_runtime())
     
+    # Register Politics & War commands
+    pnw_commands.setup(bot)
+    
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{current_time}] Bot is setting up...")
     
     # Log to file
     with open('data/bot_log.txt', 'a') as f:
         f.write(f'[{current_time}] Bot is setting up...\n')
-
 @bot.event
 async def on_ready():
     """Called when the bot is ready and connected to Discord"""
@@ -227,6 +230,22 @@ async def help_command(interaction: discord.Interaction):
             "`/userinfo [user]` - Display information about a user\n"
             "`/uptime` - Check how long the bot has been running\n"
             "`/settings` - View server settings"
+        ),
+        inline=False
+    )
+    
+    # Politics & War commands
+    embed.add_field(
+        name="Politics & War Commands",
+        value=(
+            "`/pnw_nation [nation_name]` - Look up a nation\n"
+            "`/pnw_alliance [alliance_name]` - Look up an alliance\n"
+            "`/pnw_wars [nation_name]` - Look up active wars for a nation\n"
+            "`/pnw_city [nation_name] [city_name]` - Look up city information\n"
+            "`/pnw_prices` - Check current trade prices\n"
+            "`/pnw_bank [nation_name]` - View a nation's bank\n"
+            "`/pnw_radiation` - Check global radiation levels\n"
+            "`/pnw_setapikey [api_key]` - Set your P&W API key (admin only)"
         ),
         inline=False
     )
