@@ -10,33 +10,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
-
-      # Create settings directory
-      - name: Create settings directory
-        run: mkdir -p .data
-
-      # Download previous settings if they exist
-      - name: Download previous settings
-        uses: dawidd6/action-download-artifact@v2
-        with:
-          name: bot-settings
-          path: .data
-          if_no_artifact_found: warn
-        continue-on-error: true
-
-      # Copy settings file if it exists
-      - name: Copy settings if exists
-        run: |
-          if [ -f .data/settings.json ]; then
-            cp .data/settings.json settings.json
-            echo "Found previous settings file"
-          else
-            echo "No previous settings found, will use defaults"
-          fi
+        uses: actions/checkout@v3
 
       - name: Set up Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
@@ -49,24 +26,14 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
-          touch bot_log.txt  # Ensure log file exists
           python bot.py
         timeout-minutes: 350  # GitHub Actions has a 6-hour (360 minute) limit
 
-      # Save settings for next run
-      - name: Upload settings
-        if: always()  # Upload even if the bot crashes
-        uses: actions/upload-artifact@v2
-        with:
-          name: bot-settings
-          path: settings.json
-          retention-days: 1  # Only need to keep until next run
-
-      # Upload logs
-      - name: Upload logs
-        if: always()
-        uses: actions/upload-artifact@v2
-        with:
-          name: bot-logs
-          path: bot_log.txt
-          retention-days: 7
+      - name: Commit settings changes
+        if: success()
+        run: |
+          git config --global user.name 'GitHub Actions Bot'
+          git config --global user.email 'actions@github.com'
+          git add settings.json
+          git diff --quiet && git diff --staged --quiet || git commit -m "Update settings [skip ci]"
+          git push
