@@ -3,6 +3,7 @@ import os
 import sys
 import time
 import datetime
+import asyncio
 import discord
 from discord.ext import commands
 
@@ -21,6 +22,50 @@ TOKEN = os.environ.get('BOT_TOKEN')
 # Set a maximum runtime for GitHub Actions (slightly less than the 6-hour limit)
 MAX_RUNTIME = 350 * 60  # 350 minutes in seconds
 start_time = time.time()
+
+# Background task to check runtime and exit gracefully
+async def check_runtime():
+    """Check if the bot has been running too long and exit if needed"""
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        current_runtime = time.time() - start_time
+        
+        # Log current status every hour
+        if int(current_runtime) % 3600 < 10:  # Log within first 10 seconds of each hour
+            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"[{current_time}] Bot running for {int(current_runtime/60)} minutes")
+            
+            # Log to file
+            with open('bot_log.txt', 'a') as f:
+                f.write(f'[{current_time}] Bot running for {int(current_runtime/60)} minutes\n')
+        
+        # If we're approaching the GitHub Actions timeout, exit gracefully
+        if current_runtime >= MAX_RUNTIME:
+            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"[{current_time}] Maximum runtime reached ({MAX_RUNTIME/60} minutes). Shutting down...")
+            
+            # Log to file
+            with open('bot_log.txt', 'a') as f:
+                f.write(f'[{current_time}] Maximum runtime reached. Shutting down...\n')
+                
+            # Exit the script - GitHub Actions will restart it according to schedule
+            await bot.close()
+            sys.exit(0)
+            
+        await asyncio.sleep(10)  # Check every 10 seconds
+
+@bot.event
+async def setup_hook():
+    """This is called when the bot starts, before it connects to Discord"""
+    # Start the runtime check task
+    bot.loop.create_task(check_runtime())
+    
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{current_time}] Bot is setting up...")
+    
+    # Log to file
+    with open('bot_log.txt', 'a') as f:
+        f.write(f'[{current_time}] Bot is setting up...\n')
 
 @bot.event
 async def on_ready():
@@ -173,49 +218,12 @@ async def uptime(ctx):
     
     await ctx.send(f"Bot has been online for: **{hours}h {minutes}m {seconds}s**{restart_msg}")
 
-# Background task to check runtime and exit gracefully
-async def check_runtime():
-    """Check if the bot has been running too long and exit if needed"""
-    await bot.wait_until_ready()
-    while not bot.is_closed():
-        current_runtime = time.time() - start_time
-        
-        # Log current status every hour
-        if int(current_runtime) % 3600 < 10:  # Log within first 10 seconds of each hour
-            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print(f"[{current_time}] Bot running for {int(current_runtime/60)} minutes")
-            
-            # Log to file
-            with open('bot_log.txt', 'a') as f:
-                f.write(f'[{current_time}] Bot running for {int(current_runtime/60)} minutes\n')
-        
-        # If we're approaching the GitHub Actions timeout, exit gracefully
-        if current_runtime >= MAX_RUNTIME:
-            current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print(f"[{current_time}] Maximum runtime reached ({MAX_RUNTIME/60} minutes). Shutting down...")
-            
-            # Log to file
-            with open('bot_log.txt', 'a') as f:
-                f.write(f'[{current_time}] Maximum runtime reached. Shutting down...\n')
-                
-            # Exit the script - GitHub Actions will restart it according to schedule
-            await bot.close()
-            sys.exit(0)
-            
-        await asyncio.sleep(10)  # Check every 10 seconds
-
 # Run the bot
 if __name__ == "__main__":
     # Make sure we have the token
     if not TOKEN:
         print("Error: No bot token provided. Please set the BOT_TOKEN environment variable.")
         sys.exit(1)
-    
-    # Import asyncio here to avoid issues
-    import asyncio
-    
-    # Add the runtime check task
-    bot.loop.create_task(check_runtime())
     
     # Start the bot
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
