@@ -7,6 +7,7 @@ A simple Discord bot built with discord.py and hosted via GitHub Actions.
 - **Basic Commands**: Test, Hello, Ping
 - **Information Commands**: Server info, User info, Bot info
 - **Uptime Tracking**: Check how long the bot has been running
+- **Customizable Settings**: Change prefix per server
 
 ## Setup Instructions
 
@@ -31,7 +32,7 @@ A simple Discord bot built with discord.py and hosted via GitHub Actions.
 
 1. Go to the "OAuth2" → "URL Generator" tab
 2. Select the scopes: `bot` and `applications.commands`
-3. Select the bot permissions you need (at minimum: "Send Messages", "Read Messages/View Channels")
+3. Select the bot permissions you need (at minimum: "Send Messages", "Read Messages/View Channels", "Administrator" for settings commands)
 4. Copy the generated URL and open it in your browser
 5. Select a server and authorize the bot
 
@@ -81,7 +82,27 @@ This bot is designed to run via GitHub Actions, which will automatically run the
 | `!serverinfo` | Display information about the server |
 | `!userinfo [member]` | Display information about a user (or yourself if no user is specified) |
 | `!uptime` | Check how long the bot has been running |
+| `!settings` | View current bot settings |
+| `!settings prefix <new_prefix>` | Change the command prefix for the current server |
+| `!settings reset` | Reset settings to default for the current server |
 | `!help` | Show the help message with all commands |
+
+## Customizing Bot Settings
+
+### Changing the Command Prefix
+
+Each server can have its own custom prefix:
+
+1. Use `!settings prefix <new_prefix>` to change the prefix
+   - Example: `!settings prefix ?` changes the prefix to `?`
+2. Only server administrators can change settings
+3. Use `!settings reset` to revert to the default prefix (`!`)
+
+### Settings Persistence
+
+- Settings are stored in a `settings.json` file
+- When running on GitHub Actions, settings persist between runs
+- Each server's settings are stored separately
 
 ## GitHub Actions Workflow
 
@@ -89,6 +110,7 @@ The bot runs on GitHub Actions with the following schedule:
 - Runs every 6 hours
 - Each run lasts up to 350 minutes (just under GitHub's 6-hour limit)
 - Can be manually triggered from the Actions tab
+- Settings are preserved between runs
 
 ## Limitations
 
@@ -115,72 +137,3 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - [discord.py](https://github.com/Rapptz/discord.py)
 - [GitHub Actions](https://github.com/features/actions)
-```
-
-## Additional File: .gitignore
-
-```text: \Your\Path\.gitignore
-# .gitignore
-
-# Environment variables
-.env
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Logs
-logs/
-*.log
-bot_log.txt
-
-# IDE specific files
-.idea/
-.vscode/
-*.swp
-*.swo
-.DS_Store
-```
-
-## Additional File: LICENSE
-
-```text: \Your\Path\LICENSE
-MIT License
-
-Copyright (c) 2023 Your Name
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
