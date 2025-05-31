@@ -12,6 +12,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
+      # Download previous settings if they exist
+      - name: Download settings
+        uses: actions/download-artifact@v2
+        with:
+          name: bot-settings
+          path: ./
+        continue-on-error: true  # Don't fail if no previous settings exist
+
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
@@ -26,5 +34,24 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
+          touch bot_log.txt  # Ensure log file exists
           python bot.py
         timeout-minutes: 350  # GitHub Actions has a 6-hour (360 minute) limit
+
+      # Save settings for next run
+      - name: Upload settings
+        if: always()  # Upload even if the bot crashes
+        uses: actions/upload-artifact@v2
+        with:
+          name: bot-settings
+          path: settings.json
+          retention-days: 1  # Only need to keep until next run
+
+      # Upload logs
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: bot-logs
+          path: bot_log.txt
+          retention-days: 7
