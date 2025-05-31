@@ -623,6 +623,102 @@ async def pnw_debug(ctx, command_name: str = None):
     except Exception as e:
         await ctx.send(f"Debug error: {str(e)}\nType: {type(e).__name__}")
 
+@bot.command(name="debugradiation")
+async def debug_radiation(ctx):
+    """Debug the radiation command specifically"""
+    await ctx.send("Debugging radiation command...")
+    
+    try:
+        import pnwkit
+        kit = pnwkit.QueryKit(api_key=os.environ.get('PNW_API_KEY', ''))
+        
+        # Query global data
+        query = kit.query("game_info", {}, ["radiation{global}"])
+        result = await query.get()
+        
+        debug_info = []
+        debug_info.append(f"Result type: {type(result)}")
+        
+        if hasattr(result, 'game_info'):
+            game_info = result.game_info
+            debug_info.append(f"game_info type: {type(game_info)}")
+            
+            if hasattr(game_info, 'radiation'):
+                radiation = game_info.radiation
+                debug_info.append(f"radiation type: {type(radiation)}")
+                debug_info.append(f"radiation raw value: {radiation}")
+                
+                # If it's a list, examine the first item
+                if isinstance(radiation, list):
+                    debug_info.append(f"radiation is a list with {len(radiation)} items")
+                    if radiation:
+                        first_item = radiation[0]
+                        debug_info.append(f"First item type: {type(first_item)}")
+                        debug_info.append(f"First item raw value: {first_item}")
+                        
+                        # Try different ways to access 'global'
+                        if hasattr(first_item, 'global'):
+                            global_val = getattr(first_item, 'global')
+                            debug_info.append(f"first_item.global = {global_val} (type: {type(global_val)})")
+                        else:
+                            debug_info.append("first_item has no 'global' attribute")
+                        
+                        # Try dictionary access
+                        try:
+                            global_val = first_item['global']
+                            debug_info.append(f"first_item['global'] = {global_val} (type: {type(global_val)})")
+                        except (KeyError, TypeError):
+                            debug_info.append("first_item cannot be accessed with key 'global'")
+                        
+                        # Show all attributes/keys
+                        if hasattr(first_item, '__dict__'):
+                            debug_info.append(f"first_item.__dict__: {first_item.__dict__}")
+                        elif isinstance(first_item, dict):
+                            debug_info.append(f"first_item keys: {list(first_item.keys())}")
+                        else:
+                            debug_info.append(f"first_item dir: {dir(first_item)}")
+                else:
+                    # Try different ways to access 'global'
+                    if hasattr(radiation, 'global'):
+                        global_val = getattr(radiation, 'global')
+                        debug_info.append(f"radiation.global = {global_val} (type: {type(global_val)})")
+                    else:
+                        debug_info.append("radiation has no 'global' attribute")
+                    
+                    # Try dictionary access
+                    try:
+                        global_val = radiation['global']
+                        debug_info.append(f"radiation['global'] = {global_val} (type: {type(global_val)})")
+                    except (KeyError, TypeError):
+                        debug_info.append("radiation cannot be accessed with key 'global'")
+                    
+                    # Show all attributes/keys
+                    if hasattr(radiation, '__dict__'):
+                        debug_info.append(f"radiation.__dict__: {radiation.__dict__}")
+                    elif isinstance(radiation, dict):
+                        debug_info.append(f"radiation keys: {list(radiation.keys())}")
+                    else:
+                        debug_info.append(f"radiation dir: {dir(radiation)}")
+            else:
+                debug_info.append("game_info has no radiation attribute")
+        else:
+            debug_info.append("Result has no game_info attribute")
+        
+        # Send debug info
+        debug_text = "\n".join(debug_info)
+        
+        # Split into chunks if too long
+        chunks = [debug_text[i:i+1900] for i in range(0, len(debug_text), 1900)]
+        for i, chunk in enumerate(chunks):
+            await ctx.send(f"```Debug info {i+1}/{len(chunks)}:\n{chunk}```")
+    
+    except Exception as e:
+        await ctx.send(f"Debug error: {str(e)}\nType: {type(e).__name__}")
+        # Print full traceback
+        import traceback
+        await ctx.send(f"```{traceback.format_exc()[:1900]}```")
+
+
 @bot.event
 async def on_command_error(ctx, error):
     """Handle command errors"""
