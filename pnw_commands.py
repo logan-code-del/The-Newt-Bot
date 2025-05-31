@@ -49,8 +49,26 @@ class PnWCommands(app_commands.Group):
     # Helper function to calculate time difference
     @staticmethod
     def time_since(date_str):
+        """Calculate time since a date string"""
+        if not date_str:
+            return "Unknown"
+        
+        # If date_str is a list, try to use the first element
+        if isinstance(date_str, list):
+            if not date_str:  # Empty list
+                return "Unknown"
+            date_str = date_str[0]  # Take the first item
+        
+        # Ensure date_str is a string
+        date_str = str(date_str)
+        
         try:
-            date = datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            # Handle different date formats
+            if 'Z' in date_str:
+                date = datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            else:
+                date = datetime.datetime.fromisoformat(date_str)
+            
             now = datetime.datetime.now(datetime.timezone.utc)
             diff = now - date
             
@@ -61,8 +79,10 @@ class PnWCommands(app_commands.Group):
                 return f"{hours} hours ago"
             minutes = (diff.seconds % 3600) // 60
             return f"{minutes} minutes ago"
-        except:
+        except Exception as e:
+            print(f"Error parsing date: {e}, date_str: {date_str}, type: {type(date_str)}")
             return "Unknown"
+
 
 
 # Nation command
@@ -796,55 +816,148 @@ async def set_api_key_command(interaction: discord.Interaction, api_key: str):
         await interaction.followup.send(error_message, ephemeral=True)
 
 # Debug command for developers
-async def debug_command(interaction: discord.Interaction, command: str):
-    """Debug command to help diagnose issues"""
-    # Only allow for bot owner
-    if interaction.user.id != 1350167835283816578:  # Replace with your user ID
-        await interaction.response.send_message("This command is only available to the bot owner.", ephemeral=True)
+@bot.command(name="pnwdebug")
+async def pnw_debug(ctx, command_name: str = None):
+    """Debug PnW commands"""
+    if not command_name:
+        await ctx.send("Please specify a command to debug (e.g., !pnwdebug prices)")
         return
     
-    await interaction.response.defer(ephemeral=True)
+    await ctx.send(f"Debugging PnW command: {command_name}")
     
     try:
-        if command == "prices":
+        if command_name == "prices":
             # Debug prices command
             query = kit.query("trade_prices", {}, ["coal", "oil", "uranium", "iron", "bauxite", "lead", "gasoline", 
                                                   "munitions", "steel", "aluminum", "food", "credits"])
             
             result = await query.get()
             
-            # Print raw data for debugging
-            raw_data = str(result.trade_prices)
-            data_type = str(type(result.trade_prices))
+            # Print detailed information about the result
+            debug_info = []
+            debug_info.append(f"Result type: {type(result)}")
             
-            debug_info = f"Data type: {data_type}\nRaw data: {raw_data[:1900]}"  # Limit to Discord message size
+            if hasattr(result, 'trade_prices'):
+                trade_prices = result.trade_prices
+                debug_info.append(f"trade_prices type: {type(trade_prices)}")
+                
+                if isinstance(trade_prices, list):
+                    debug_info.append(f"trade_prices is a list with {len(trade_prices)} items")
+                    if trade_prices:
+                        first_item = trade_prices[0]
+                        debug_info.append(f"First item type: {type(first_item)}")
+                        debug_info.append(f"First item attributes: {dir(first_item)}")
+                        
+                        # Try to access some attributes
+                        for attr in ['coal', 'oil', 'uranium']:
+                            try:
+                                value = getattr(first_item, attr)
+                                debug_info.append(f"first_item.{attr} = {value} (type: {type(value)})")
+                            except AttributeError:
+                                debug_info.append(f"first_item has no attribute '{attr}'")
+                            
+                            try:
+                                value = first_item[attr]
+                                debug_info.append(f"first_item['{attr}'] = {value} (type: {type(value)})")
+                            except (KeyError, TypeError):
+                                debug_info.append(f"first_item cannot be accessed with key '{attr}'")
+                else:
+                    debug_info.append(f"trade_prices attributes: {dir(trade_prices)}")
+            else:
+                debug_info.append("Result has no trade_prices attribute")
             
-            await interaction.followup.send(f"```{debug_info}```", ephemeral=True)
+            # Send debug info
+            debug_text = "\n".join(debug_info)
+            
+            # Split into chunks if too long
+            chunks = [debug_text[i:i+1900] for i in range(0, len(debug_text), 1900)]
+            for i, chunk in enumerate(chunks):
+                await ctx.send(f"```Debug info {i+1}/{len(chunks)}:\n{chunk}```")
         
-        elif command == "radiation":
-            # Debug radiation command
+        elif command_name == "radiation":
+            # Similar debug for radiation command
             query = kit.query("game_info", {}, ["radiation{global}"])
-            
             result = await query.get()
             
-            # Print raw data for debugging
-            raw_data = str(result.game_info)
-            data_type = str(type(result.game_info))
+            debug_info = []
+            debug_info.append(f"Result type: {type(result)}")
             
-            if result.game_info and result.game_info.radiation:
-                radiation_type = str(type(result.game_info.radiation))
-                radiation_data = str(result.game_info.radiation)
-                debug_info = f"Game info type: {data_type}\nRadiation type: {radiation_type}\nRadiation data: {radiation_data[:1900]}"
+            if hasattr(result, 'game_info'):
+                game_info = result.game_info
+                debug_info.append(f"game_info type: {type(game_info)}")
+                
+                if hasattr(game_info, 'radiation'):
+                    radiation = game_info.radiation
+                    debug_info.append(f"radiation type: {type(radiation)}")
+                    
+                    if hasattr(radiation, 'global'):
+                        global_rad = radiation.global
+                        debug_info.append(f"radiation.global = {global_rad} (type: {type(global_rad)})")
+                    else:
+                        debug_info.append("radiation has no 'global' attribute")
+                        
+                        # Try dictionary access
+                        try:
+                            global_rad = radiation['global']
+                            debug_info.append(f"radiation['global'] = {global_rad} (type: {type(global_rad)})")
+                        except (KeyError, TypeError):
+                            debug_info.append("radiation cannot be accessed with key 'global'")
+                else:
+                    debug_info.append("game_info has no radiation attribute")
             else:
-                debug_info = f"Game info type: {data_type}\nRaw data: {raw_data[:1900]}"
+                debug_info.append("Result has no game_info attribute")
             
-            await interaction.followup.send(f"```{debug_info}```", ephemeral=True)
+            # Send debug info
+            debug_text = "\n".join(debug_info)
+            await ctx.send(f"```{debug_text}```")
         
         else:
-            await interaction.followup.send(f"Unknown debug command: {command}", ephemeral=True)
+            await ctx.send(f"Unknown debug command: {command_name}")
     
     except Exception as e:
-        await interaction.followup.send(f"Debug error: {str(e)}", ephemeral=True)
+        await ctx.send(f"Debug error: {str(e)}\nType: {type(e).__name__}")
+@bot.event
+async def on_command_error(ctx, error):
+    """Handle command errors"""
+    if isinstance(error, commands.CommandNotFound):
+        return  # Ignore command not found errors
+    
+    error_type = type(error).__name__
+    error_msg = str(error)
+    
+    # Get the traceback
+    import traceback
+    tb = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
+    
+    # Log the error
+    print(f"Command error: {error_type}: {error_msg}")
+    print(f"Traceback:\n{tb}")
+    
+    # Send a user-friendly message
+    await ctx.send(f"An error occurred: {error_type}: {error_msg}")
+
+@bot.tree.error
+async def on_app_command_error(interaction: discord.Interaction, error):
+    """Handle application command errors"""
+    error_type = type(error).__name__
+    error_msg = str(error)
+    
+    # Get the traceback
+    import traceback
+    tb = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
+    
+    # Log the error
+    print(f"App command error: {error_type}: {error_msg}")
+    print(f"Traceback:\n{tb}")
+    
+    # Send a user-friendly message
+    try:
+        if interaction.response.is_done():
+            await interaction.followup.send(f"An error occurred: {error_type}: {error_msg}", ephemeral=True)
+        else:
+            await interaction.response.send_message(f"An error occurred: {error_type}: {error_msg}", ephemeral=True)
+    except Exception as e:
+        print(f"Error sending error message: {e}")
 
 # Function to register all PnW commands
 def setup(bot):
@@ -898,13 +1011,6 @@ def setup(bot):
         name="setapikey",
         description="Set your Politics & War API key",
         callback=set_api_key_command
-    ))
-    
-    # Add debug command (hidden from normal users)
-    pnw_group.add_command(app_commands.Command(
-        name="debug",
-        description="Debug command for developers",
-        callback=debug_command
     ))
     
     # Add the group to the command tree
