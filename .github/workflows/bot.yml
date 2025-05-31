@@ -8,9 +8,16 @@ on:
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    # Add permissions to allow committing back to the repository
+    permissions:
+      contents: write
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          # Fetch all history so we can commit back
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v4
@@ -26,14 +33,27 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
+          # Create data directory if it doesn't exist
+          mkdir -p data
+          # Run the bot
           python bot.py
         timeout-minutes: 350  # GitHub Actions has a 6-hour (360 minute) limit
 
       - name: Commit settings changes
-        if: success()
+        if: always()  # Run even if the bot crashes
         run: |
+          # Configure git
           git config --global user.name 'GitHub Actions Bot'
           git config --global user.email 'actions@github.com'
-          git add settings.json
-          git diff --quiet && git diff --staged --quiet || git commit -m "Update settings [skip ci]"
-          git push
+          
+          # Add any new or changed files in the data directory
+          git add data/
+          
+          # Check if there are changes to commit
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            # Commit and push changes
+            git commit -m "Update bot settings and data [skip ci]"
+            git push
+          fi
