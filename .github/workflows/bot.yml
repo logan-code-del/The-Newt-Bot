@@ -1,3 +1,4 @@
+# Updated .github/workflows/bot.yml
 name: Run Discord Bot
 
 on:
@@ -30,7 +31,6 @@ jobs:
           python bot.py
         timeout-minutes: 350  # GitHub Actions has a 6-hour (360 minute) limit
 
-      # Simplified artifact upload
       - name: Upload logs
         if: always()
         run: |
@@ -39,11 +39,10 @@ jobs:
             cp bot_log.txt logs/
           else
             echo "No log file found" > logs/no_logs.txt
-          fi
-        
+
       - name: Archive logs
         if: always()
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3 # Updated version
         with:
           name: bot-logs
           path: logs/
