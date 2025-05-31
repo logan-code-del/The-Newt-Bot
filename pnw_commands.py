@@ -891,7 +891,7 @@ async def pnw_debug(ctx, command_name: str = None):
                     debug_info.append(f"radiation type: {type(radiation)}")
                     
                     if hasattr(radiation, 'global'):
-                        global_rad = radiation.global
+                        global_rad = radiation
                         debug_info.append(f"radiation.global = {global_rad} (type: {type(global_rad)})")
                     else:
                         debug_info.append("radiation has no 'global' attribute")
