@@ -29,3 +29,11 @@ jobs:
         run: |
           python bot.py
         timeout-minutes: 350  # GitHub Actions has a 6-hour (360 minute) limit
+
+      - name: Upload logs
+        if: always()  # Upload logs even if the bot crashes
+        uses: actions/upload-artifact@v3
+        with:
+          name: bot-logs
+          path: bot_log.txt
+          retention-days: 7
