@@ -44,8 +44,6 @@ class PnWCommands(app_commands.Group):
 
 
 # Nation command
-@app_commands.command(name="pnw_nation", description="Look up a Politics & War nation")
-@app_commands.describe(nation_name="Name of the nation to look up")
 async def nation_command(interaction: discord.Interaction, nation_name: str):
     await interaction.response.defer()
     
@@ -110,10 +108,9 @@ async def nation_command(interaction: discord.Interaction, nation_name: str):
         await interaction.followup.send(f"Error looking up nation: {str(e)}")
 
 # Alliance command
-@app_commands.command(name="pnw_alliance", description="Look up a Politics & War alliance")
-@app_commands.describe(alliance_name="Name of the alliance to look up")
 async def alliance_command(interaction: discord.Interaction, alliance_name: str):
     await interaction.response.defer()
+
     
     try:
         # Query the alliance data
@@ -152,8 +149,6 @@ async def alliance_command(interaction: discord.Interaction, alliance_name: str)
         await interaction.followup.send(f"Error looking up alliance: {str(e)}")
 
 # War command
-@app_commands.command(name="pnw_wars", description="Look up active wars for a nation")
-@app_commands.describe(nation_name="Name of the nation to look up wars for")
 async def wars_command(interaction: discord.Interaction, nation_name: str):
     await interaction.response.defer()
     
@@ -234,8 +229,6 @@ async def wars_command(interaction: discord.Interaction, nation_name: str):
         await interaction.followup.send(f"Error looking up wars: {str(e)}")
 
 # City command
-@app_commands.command(name="pnw_city", description="Look up a city in Politics & War")
-@app_commands.describe(nation_name="Name of the nation", city_name="Name of the city (optional)")
 async def city_command(interaction: discord.Interaction, nation_name: str, city_name: Optional[str] = None):
     await interaction.response.defer()
     
@@ -310,8 +303,8 @@ async def city_command(interaction: discord.Interaction, nation_name: str, city_
     except Exception as e:
         await interaction.followup.send(f"Error looking up city: {str(e)}")
 
+
 # Prices command
-@app_commands.command(name="pnw_prices", description="Look up current trade prices in Politics & War")
 async def prices_command(interaction: discord.Interaction):
     await interaction.response.defer()
     
@@ -364,8 +357,6 @@ async def prices_command(interaction: discord.Interaction):
         await interaction.followup.send(f"Error looking up prices: {str(e)}")
 
 # Bank command
-@app_commands.command(name="pnw_bank", description="Look up a nation's bank in Politics & War")
-@app_commands.describe(nation_name="Name of the nation to look up bank for")
 async def bank_command(interaction: discord.Interaction, nation_name: str):
     await interaction.response.defer()
     
@@ -421,8 +412,8 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
     except Exception as e:
         await interaction.followup.send(f"Error looking up bank: {str(e)}")
 
+
 # Radiation command
-@app_commands.command(name="pnw_radiation", description="Look up global radiation levels in Politics & War")
 async def radiation_command(interaction: discord.Interaction):
     await interaction.response.defer()
     
@@ -467,10 +458,8 @@ async def radiation_command(interaction: discord.Interaction):
     except Exception as e:
         await interaction.followup.send(f"Error looking up radiation: {str(e)}")
 
+
 # Set API key command
-@app_commands.command(name="pnw_setapikey", description="Set your Politics & War API key")
-@app_commands.describe(api_key="Your Politics & War API key")
-@app_commands.default_permissions(administrator=True)
 async def set_api_key_command(interaction: discord.Interaction, api_key: str):
     # Only allow in DMs or by server admins
     if interaction.guild and not interaction.user.guild_permissions.administrator:
@@ -516,15 +505,59 @@ async def set_api_key_command(interaction: discord.Interaction, api_key: str):
 
 # Function to register all PnW commands
 def setup(bot):
-    # Add individual commands
-    bot.tree.add_command(nation_command)
-    bot.tree.add_command(alliance_command)
-    bot.tree.add_command(wars_command)
-    bot.tree.add_command(city_command)
-    bot.tree.add_command(prices_command)
-    bot.tree.add_command(bank_command)
-    bot.tree.add_command(radiation_command)
-    bot.tree.add_command(set_api_key_command)
+    # Create a command group for PnW commands
+    pnw_group = app_commands.Group(name="pnw", description="Politics & War commands")
     
+    # Add commands to the group
+    pnw_group.add_command(app_commands.Command(
+        name="nation",
+        description="Look up a Politics & War nation",
+        callback=nation_command
+    ))
+    
+    pnw_group.add_command(app_commands.Command(
+        name="alliance",
+        description="Look up a Politics & War alliance",
+        callback=alliance_command
+    ))
+    
+    pnw_group.add_command(app_commands.Command(
+        name="wars",
+        description="Look up active wars for a nation",
+        callback=wars_command
+    ))
+    
+    pnw_group.add_command(app_commands.Command(
+        name="city",
+        description="Look up a city in Politics & War",
+        callback=city_command
+    ))
+    
+    pnw_group.add_command(app_commands.Command(
+        name="prices",
+        description="Look up current trade prices in Politics & War",
+        callback=prices_command
+    ))
+    
+    pnw_group.add_command(app_commands.Command(
+        name="bank",
+        description="Look up a nation's bank in Politics & War",
+        callback=bank_command
+    ))
+    
+    pnw_group.add_command(app_commands.Command(
+        name="radiation",
+        description="Look up global radiation levels in Politics & War",
+        callback=radiation_command
+    ))
+    
+    pnw_group.add_command(app_commands.Command(
+        name="setapikey",
+        description="Set your Politics & War API key",
+        callback=set_api_key_command
+    ))
+    
+    # Add the group to the command tree
+    bot.tree.add_command(pnw_group)
     # Log setup
-    print("Politics & War commands registered")
+    print("Politics & War commands registered as group")
