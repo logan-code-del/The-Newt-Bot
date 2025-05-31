@@ -82,6 +82,18 @@ async def check_runtime():
             
         await asyncio.sleep(10)  # Check every 10 seconds
 
+@bot.command()
+@commands.is_owner()
+async def sync(ctx):
+    """Sync slash commands with Discord"""
+    try:
+        synced = await bot.tree.sync()
+        await ctx.send(f"Synced {len(synced)} command(s)")
+        print(f"Synced {len(synced)} command(s)")
+    except Exception as e:
+        await ctx.send(f"Failed to sync commands: {str(e)}")
+        print(f"Failed to sync commands: {str(e)}")
+
 @bot.event
 async def setup_hook():
     """This is called when the bot starts, before it connects to Discord"""
@@ -91,12 +103,21 @@ async def setup_hook():
     # Register Politics & War commands
     pnw_commands.setup(bot)
     
+    # Sync commands with Discord
+    try:
+        print("Syncing commands with Discord...")
+        synced = await bot.tree.sync()
+        print(f"Synced {len(synced)} command(s)")
+    except Exception as e:
+        print(f"Failed to sync commands: {str(e)}")
+    
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{current_time}] Bot is setting up...")
     
     # Log to file
     with open('data/bot_log.txt', 'a') as f:
         f.write(f'[{current_time}] Bot is setting up...\n')
+
 @bot.event
 async def on_ready():
     """Called when the bot is ready and connected to Discord"""
