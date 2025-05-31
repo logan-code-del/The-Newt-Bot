@@ -7,13 +7,12 @@ import json
 import os
 from typing import Optional, List
 
-# Initialize the PnWKit client
-kit = pnwkit.QueryKit()
-
 # Load API key if available
 API_KEY = os.environ.get('PNW_API_KEY', '')
-if API_KEY:
-    kit.api_key = API_KEY
+
+# Initialize the PnWKit client with the API key
+# If no API key is available, use an empty string - we'll handle authentication later
+kit = pnwkit.QueryKit(api_key=API_KEY)
 
 # Create a group for PnW commands
 class PnWCommands(app_commands.Group):
@@ -42,6 +41,7 @@ class PnWCommands(app_commands.Group):
             return f"{minutes} minutes ago"
         except:
             return "Unknown"
+
 
 # Nation command
 @app_commands.command(name="nation", description="Look up a Politics & War nation")
@@ -503,15 +503,16 @@ async def set_api_key_command(interaction: discord.Interaction, api_key: str):
         save_settings(settings)
         
         # Set the API key for the current session
-        global API_KEY
+        global API_KEY, kit
         API_KEY = api_key
-        kit.api_key = api_key
+        
+        # Create a new QueryKit instance with the updated API key
+        kit = pnwkit.QueryKit(api_key=API_KEY)
         
         await interaction.followup.send("API key set successfully! You can now use commands that require authentication.", ephemeral=True)
     except Exception as e:
-        await interaction.followup.send(f"Error setting API key: {str(e)}", ephemeral=True)
+        await interaction.followup.send(f"Error setting API key: {str(e)}", ephemeral=True) register all PnW commands
 
-# Function to register all PnW commands
 def setup(bot):
     # Add individual commands
     bot.tree.add_command(nation_command, name="pnw_nation")
