@@ -32,6 +32,7 @@ jobs:
       - name: Run Discord bot
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          PNW_API_KEY: ${{ secrets.PNW_API_KEY }}
         run: |
           # Create data directory if it doesn't exist
           mkdir -p data
