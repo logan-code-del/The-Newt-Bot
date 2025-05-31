@@ -1,4 +1,3 @@
-# Updated .github/workflows/bot.yml
 name: Run Discord Bot
 
 on:
@@ -27,23 +26,5 @@ jobs:
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
         run: |
-          touch bot_log.txt  # Ensure log file exists even if bot doesn't create it
           python bot.py
         timeout-minutes: 350  # GitHub Actions has a 6-hour (360 minute) limit
-
-      - name: Upload logs
-        if: always()
-        run: |
-          if [ -f bot_log.txt ]; then
-            mkdir -p logs
-            cp bot_log.txt logs/
-          else
-            echo "No log file found" > logs/no_logs.txt
-
-      - name: Archive logs
-        if: always()
-        uses: actions/upload-artifact@v3 # Updated version
-        with:
-          name: bot-logs
-          path: logs/
-          retention-days: 5
