@@ -32,7 +32,7 @@ jobs:
 
       - name: Upload logs
         if: always()  # Upload logs even if the bot crashes
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v2  # Changed from v3 to v2
         with:
           name: bot-logs
           path: bot_log.txt
