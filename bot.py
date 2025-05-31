@@ -1,26 +1,23 @@
 # bot.py
 import os
-
 import discord
 from discord.ext import commands
-from dotenv import load_dotenv
-
-load_dotenv()
-TOKEN = os.getenv('BOT_TOKEN')
 
 # Set up intents
 intents = discord.Intents.default()
-intents.message_content = True  # Enable message content intent
+intents.message_content = True
 
 # Create bot with intents
-bot = commands.Bot(command_prefix='/', intents=intents)
+bot = commands.Bot(command_prefix='!', intents=intents)
 
 @bot.event
 async def on_ready():
     print(f'{bot.user} has connected to Discord!')
+    print(f'Bot is in {len(bot.guilds)} servers')
 
 @bot.command()
 async def test(ctx):
     await ctx.send('Test command works!')
 
-bot.run(TOKEN)
+# Get token from environment variable
+bot.run(os.environ.get('BOT_TOKEN'))
