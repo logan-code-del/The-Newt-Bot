@@ -799,7 +799,7 @@ async def set_api_key_command(interaction: discord.Interaction, api_key: str):
 async def debug_command(interaction: discord.Interaction, command: str):
     """Debug command to help diagnose issues"""
     # Only allow for bot owner
-    if interaction.user.id != 123456789:  # Replace with your user ID
+    if interaction.user.id != 1350167835283816578:  # Replace with your user ID
         await interaction.response.send_message("This command is only available to the bot owner.", ephemeral=True)
         return
     
