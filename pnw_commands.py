@@ -511,8 +511,9 @@ async def set_api_key_command(interaction: discord.Interaction, api_key: str):
         
         await interaction.followup.send("API key set successfully! You can now use commands that require authentication.", ephemeral=True)
     except Exception as e:
-        await interaction.followup.send(f"Error setting API key: {str(e)}", ephemeral=True) register all PnW commands
+        await interaction.followup.send(f"Error setting API key: {str(e)}", ephemeral=True)
 
+# Function to register all PnW commands
 def setup(bot):
     # Add individual commands
     bot.tree.add_command(nation_command, name="pnw_nation")
