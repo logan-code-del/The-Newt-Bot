@@ -2,17 +2,47 @@
 import os
 import sys
 import time
+import json
 import datetime
 import asyncio
 import discord
 from discord.ext import commands
 
+# Function to load settings
+def load_settings():
+    try:
+        with open('settings.json', 'r') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        # Default settings
+        default_settings = {'default_prefix': '!', 'guild_prefixes': {}}
+        save_settings(default_settings)
+        return default_settings
+
+# Function to save settings
+def save_settings(settings):
+    with open('settings.json', 'w') as f:
+        json.dump(settings, f, indent=4)
+
+# Load settings
+settings = load_settings()
+
+# Function to get prefix for a specific guild
+def get_prefix(bot, message):
+    # DMs will use the default prefix
+    if message.guild is None:
+        return settings['default_prefix']
+    
+    # Get guild-specific prefix or use default
+    guild_id = str(message.guild.id)
+    return settings['guild_prefixes'].get(guild_id, settings['default_prefix'])
+
 # Set up intents
 intents = discord.Intents.default()
 intents.message_content = True  # Enable message content intent
 
-# Create bot with intents
-bot = commands.Bot(command_prefix='!', intents=intents, help_command=commands.DefaultHelpCommand(
+# Create bot with dynamic prefix
+bot = commands.Bot(command_prefix=get_prefix, intents=intents, help_command=commands.DefaultHelpCommand(
     no_category="Commands"
 ))
 
@@ -75,11 +105,22 @@ async def on_ready():
     print(f'[{current_time}] Bot is in {len(bot.guilds)} servers')
     
     # Set bot status
-    await bot.change_presence(activity=discord.Game(name="!help for commands"))
+    await bot.change_presence(activity=discord.Game(name=f"Type {settings['default_prefix']}help for commands"))
     
     # Log to a file that can be accessed in GitHub Actions logs
     with open('bot_log.txt', 'a') as f:
         f.write(f'[{current_time}] Bot started successfully\n')
+
+@bot.event
+async def on_guild_join(guild):
+    """Called when the bot joins a new guild"""
+    # Use default prefix for new guilds
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f'[{current_time}] Joined new guild: {guild.name} (ID: {guild.id})')
+    
+    # Log to file
+    with open('bot_log.txt', 'a') as f:
+        f.write(f'[{current_time}] Joined new guild: {guild.name} (ID: {guild.id})\n')
 
 @bot.event
 async def on_command_error(ctx, error):
@@ -87,9 +128,9 @@ async def on_command_error(ctx, error):
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     
     if isinstance(error, commands.CommandNotFound):
-        await ctx.send("Command not found. Try `!help` for a list of commands.")
+        await ctx.send("Command not found. Try `help` for a list of commands.")
     elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send("Missing required argument. Check `!help [command]` for usage.")
+        await ctx.send("Missing required argument. Check `help [command]` for usage.")
     elif isinstance(error, commands.MissingPermissions):
         await ctx.send("You don't have permission to use this command.")
     else:
@@ -99,6 +140,69 @@ async def on_command_error(ctx, error):
         # Log errors to a file
         with open('bot_log.txt', 'a') as f:
             f.write(f'[{current_time}] Error: {error}\n')
+
+# Settings command group
+@bot.group(name="settings", help="Change bot settings", invoke_without_command=True)
+@commands.has_permissions(administrator=True)
+async def settings_cmd(ctx):
+    """Command group for bot settings"""
+    # If no subcommand was specified, show current settings
+    prefix = get_prefix(bot, ctx.message)
+    
+    embed = discord.Embed(
+        title="Bot Settings",
+        description="Current bot settings for this server",
+        color=discord.Color.blue()
+    )
+    
+    embed.add_field(name="Current Prefix", value=f"`{prefix}`", inline=False)
+    embed.add_field(name="Available Settings Commands", value=(
+        f"`{prefix}settings prefix <new_prefix>` - Change command prefix\n"
+        f"`{prefix}settings reset` - Reset to default settings"
+    ), inline=False)
+    
+    await ctx.send(embed=embed)
+
+@settings_cmd.command(name="prefix", help="Change the command prefix")
+@commands.has_permissions(administrator=True)
+async def settings_prefix(ctx, new_prefix: str):
+    """Change the command prefix for this server"""
+    if len(new_prefix) > 5:
+        await ctx.send("Prefix must be 5 characters or less.")
+        return
+    
+    # Update the prefix for this guild
+    guild_id = str(ctx.guild.id)
+    settings['guild_prefixes'][guild_id] = new_prefix
+    save_settings(settings)
+    
+    await ctx.send(f"Prefix changed to `{new_prefix}` for this server.")
+    
+    # Update bot status if this is the default prefix
+    if guild_id == settings.get('default_guild'):
+        await bot.change_presence(activity=discord.Game(name=f"Type {new_prefix}help for commands"))
+
+@settings_cmd.command(name="reset", help="Reset settings to default")
+@commands.has_permissions(administrator=True)
+async def settings_reset(ctx):
+    """Reset settings to default for this server"""
+    guild_id = str(ctx.guild.id)
+    
+    # Remove custom prefix for this guild if it exists
+    if guild_id in settings['guild_prefixes']:
+        del settings['guild_prefixes'][guild_id]
+        save_settings(settings)
+        
+    await ctx.send(f"Settings reset to default. Prefix is now `{settings['default_prefix']}`.")
+
+@settings_cmd.error
+async def settings_error(ctx, error):
+    """Handle errors in the settings command"""
+    if isinstance(error, commands.MissingPermissions):
+        await ctx.send("You need administrator permissions to change bot settings.")
+    else:
+        # Pass to the global error handler
+        await on_command_error(ctx, error)
 
 @bot.command(name="test", help="Test if the bot is responding")
 async def test(ctx):
@@ -119,6 +223,9 @@ async def info(ctx):
     minutes, seconds = divmod(remainder, 60)
     uptime_str = f"{hours}h {minutes}m {seconds}s"
     
+    # Get current prefix
+    prefix = get_prefix(bot, ctx.message)
+    
     embed = discord.Embed(
         title="Bot Information",
         description="A simple Discord bot created with discord.py",
@@ -126,7 +233,7 @@ async def info(ctx):
     )
     embed.add_field(name="Creator", value="Your Name", inline=True)
     embed.add_field(name="Server Count", value=f"{len(bot.guilds)}", inline=True)
-    embed.add_field(name="Command Prefix", value="`!`", inline=True)
+    embed.add_field(name="Command Prefix", value=f"`{prefix}`", inline=True)
     embed.add_field(name="Framework", value="discord.py", inline=True)
     embed.add_field(name="Current Uptime", value=uptime_str, inline=True)
     embed.add_field(name="Hosted via", value="GitHub Actions", inline=True)
@@ -151,6 +258,9 @@ async def serverinfo(ctx):
     # Get server creation date
     created_at = server.created_at.strftime("%B %d, %Y")
     
+    # Get current prefix
+    prefix = get_prefix(bot, ctx.message)
+    
     # Create embed
     embed = discord.Embed(
         title=f"{server.name} Server Information",
@@ -167,6 +277,7 @@ async def serverinfo(ctx):
     embed.add_field(name="Channels", value=f"📝 {text_channels} | 🔊 {voice_channels}", inline=True)
     embed.add_field(name="Roles", value=len(server.roles), inline=True)
     embed.add_field(name="Emojis", value=len(server.emojis), inline=True)
+    embed.add_field(name="Command Prefix", value=f"`{prefix}`", inline=True)
     
     await ctx.send(embed=embed)
 
@@ -233,4 +344,10 @@ if __name__ == "__main__":
     with open('bot_log.txt', 'a') as f:
         f.write(f'[{current_time}] Starting bot...\n')
         
+    # Create settings.json if it doesn't exist
+    if not os.path.exists('settings.json'):
+        default_settings = {'default_prefix': '!', 'guild_prefixes': {}}
+        with open('settings.json', 'w') as f:
+            json.dump(default_settings, f, indent=4)
+    
     bot.run(TOKEN)
