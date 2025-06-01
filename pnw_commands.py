@@ -536,7 +536,7 @@ async def prices_command(interaction: discord.Interaction):
     try:
         # Query trade prices using the correct syntax
         query = kit.query(
-            "trade_prices",
+            "tradeprices",
             {},
             "coal", "oil", "uranium", "iron", "bauxite", "lead", 
             "gasoline", "munitions", "steel", "aluminum", "food", "credits"
@@ -545,12 +545,12 @@ async def prices_command(interaction: discord.Interaction):
         result = await query.get()
         
         # Handle empty result
-        if not result.trade_prices:
+        if not result.tradeprices:
             await interaction.followup.send("Could not retrieve trade prices.")
             return
         
         # Get the first item if it's a list
-        prices = result.trade_prices
+        prices = result.tradeprices
         if isinstance(prices, list) and prices:
             prices = prices[0]
         
