@@ -82,8 +82,6 @@ class PnWCommands(app_commands.Group):
     def __init__(self):
         super().__init__(name="pnw", description="Politics & War commands")
     
-
-
 # Nation command
 async def nation_command(interaction: discord.Interaction, nation_name: str):
     await interaction.response.defer()
@@ -178,7 +176,6 @@ async def nation_command(interaction: discord.Interaction, nation_name: str):
         error_message = f"Error looking up nation: {str(e)}"
         print(f"Debug - Nation command error: {error_message}")
         await interaction.followup.send(error_message)
-
 
 # Alliance command with pagination
 async def alliance_command(interaction: discord.Interaction, alliance_name: str):
@@ -499,8 +496,6 @@ async def wars_command(interaction: discord.Interaction, nation_name: str):
         print(f"Debug - Wars command error: {error_message}")
         await interaction.followup.send(error_message)
 
-
-
 # City command
 async def city_command(interaction: discord.Interaction, nation_name: str, city_name: Optional[str] = None):
     await interaction.response.defer()
@@ -748,20 +743,24 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
             await interaction.followup.send(f"Nation '{nation_name}' is not in an alliance.")
             return
         
-        # Query bank records - UPDATED to use "bankrecs" instead of "banks"
+        # Query bank records with updated parameters
         bank_query = kit.query(
-            "bankrecs",  # Changed from "banks" to "bankrecs"
-            {"alliance_id": alliance_id, "receiver_id": nation_id},
+            "bankrecs",
+            {
+                "nation_id": nation_id,  # Use nation_id instead of receiver_id
+                # No alliance_id parameter needed
+                "first": 10  # Limit to 10 records
+            },
             "id", "date", "money", "coal", "oil", "uranium", "iron", "bauxite", "lead", "gasoline",
             "munitions", "steel", "aluminum", "food", 
-            pnwkit.Field("sender", {}, "id", "nation_name"), 
+            pnwkit.Field("sender", {}, "id", "nation_name"),
             "note"
         )
         
         bank_result = await bank_query.get_async()
         
-        # Handle list or empty result - UPDATED to use bankrecs
-        bankrecs = bank_result.bankrecs  # Changed from banks to bankrecs
+        # Handle list or empty result
+        bankrecs = bank_result.bankrecs
         if not bankrecs or (isinstance(bankrecs, list) and len(bankrecs) == 0):
             await interaction.followup.send(f"No bank records found for '{nation_name}'.")
             return
@@ -784,12 +783,12 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
         )
         
         # Process bank records (up to 5 most recent)
-        if isinstance(bankrecs, list):  # Changed from banks to bankrecs
+        if isinstance(bankrecs, list):
             # Sort by date (most recent first)
             bankrecs.sort(key=lambda x: safe_get(x, "date", ""), reverse=True)
             bankrecs = bankrecs[:5]  # Take up to 5 most recent
             
-            for bank in bankrecs:  # Changed from banks to bankrecs
+            for bank in bankrecs:
                 date = safe_get(bank, "date")
                 sender = safe_get(bank, "sender")
                 sender_name = safe_get(sender, "nation_name", "Unknown")
@@ -823,26 +822,26 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
                 embed.add_field(name=f"Transaction #{safe_get(bank, 'id')}", value=bank_info, inline=False)
         else:
             # Handle single bank record case
-            date = safe_get(bankrecs, "date")  # Changed from banks to bankrecs
-            sender = safe_get(bankrecs, "sender")  # Changed from banks to bankrecs
+            date = safe_get(bankrecs, "date")
+            sender = safe_get(bankrecs, "sender")
             sender_name = safe_get(sender, "nation_name", "Unknown")
             
             # Resources
             resources = []
-            money = safe_get(bankrecs, "money")  # Changed from banks to bankrecs
+            money = safe_get(bankrecs, "money")
             if money and float(money) != 0:
                 resources.append(f"${format_number(money)}")
             
             for resource in ["coal", "oil", "uranium", "iron", "bauxite", "lead",
                              "gasoline", "munitions", "steel", "aluminum", "food"]:
-                amount = safe_get(bankrecs, resource)  # Changed from banks to bankrecs
+                amount = safe_get(bankrecs, resource)
                 if amount and float(amount) != 0:
                     resources.append(f"{format_number(amount)} {resource.capitalize()}")
             
             resource_text = ", ".join(resources) if resources else "None"
             
             # Note
-            note = safe_get(bankrecs, "note", "")  # Changed from banks to bankrecs
+            note = safe_get(bankrecs, "note", "")
             if note:
                 note = f"\nNote: {note}"
             
@@ -853,7 +852,7 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
                 f"{note}"
             )
             
-            embed.add_field(name=f"Transaction #{safe_get(bankrecs, 'id')}", value=bank_info, inline=False)  # Changed from banks to bankrecs
+            embed.add_field(name=f"Transaction #{safe_get(bankrecs, 'id')}", value=bank_info, inline=False)
         
         await interaction.followup.send(embed=embed)
     except Exception as e:
@@ -865,25 +864,23 @@ async def radiation_command(interaction: discord.Interaction):
     await interaction.response.defer()
     
     try:
-        # Query radiation using the correct syntax
+        # Query radiation with proper sub-selection
         query = kit.query(
             "game_info",
             {},
-            "radiation"  # Changed to directly query radiation
+            pnwkit.Field("radiation", {}, "global")  # Specify the sub-field "global"
         )
         
         result = await query.get_async()
         
         # Handle empty result
-        if not result or not hasattr(result, "game_info"):
+        if not result or not hasattr(result, "game_info") or not hasattr(result.game_info, "radiation"):
             await interaction.followup.send("Could not retrieve radiation information.")
             return
         
         # Access the radiation data
-        radiation_value = None
-        if hasattr(result.game_info, "radiation"):
-            radiation_value = result.game_info.radiation
-            
+        radiation_value = result.game_info.radiation.global
+        
         if radiation_value is None:
             await interaction.followup.send("Could not retrieve radiation information.")
             return
@@ -892,23 +889,24 @@ async def radiation_command(interaction: discord.Interaction):
         embed = discord.Embed(
             title="Global Radiation Levels",
             description=f"Current global radiation: {radiation_value}%",
-            color=discord.Color.green() if radiation_value < 15 else discord.Color.red()
+            color=discord.Color.green() if float(radiation_value) < 15 else discord.Color.red()
         )
         
         # Add effects based on radiation level
         effects = []
+        rad_value = float(radiation_value)
         
-        if radiation_value < 15:
+        if rad_value < 15:
             effects.append("No significant effects")
-        if radiation_value >= 15:
+        if rad_value >= 15:
             effects.append("15%+ : -1% Population Growth")
-        if radiation_value >= 30:
+        if rad_value >= 30:
             effects.append("30%+ : -2% Population Growth")
-        if radiation_value >= 50:
+        if rad_value >= 50:
             effects.append("50%+ : -3% Population Growth")
-        if radiation_value >= 75:
+        if rad_value >= 75:
             effects.append("75%+ : -4% Population Growth")
-        if radiation_value >= 100:
+        if rad_value >= 100:
             effects.append("100%+ : -5% Population Growth")
         
         embed.add_field(name="Effects", value="\n".join(effects), inline=False)
@@ -925,7 +923,6 @@ async def radiation_command(interaction: discord.Interaction):
         error_message = f"Error looking up radiation: {str(e)}"
         print(f"Debug - Radiation command error: {error_message}")
         await interaction.followup.send(f"Error looking up radiation: {str(e)}")
-
 
 # Set API key command
 async def set_api_key_command(interaction: discord.Interaction, api_key: str):
@@ -1038,7 +1035,6 @@ async def debug_query_command(interaction: discord.Interaction, query_type: str)
         print(f"Debug command error: {error_message}")
         import traceback
         await interaction.followup.send(f"Error: {error_message}\n```{traceback.format_exc()[:1500]}```")
-
 
 # Function to register all PnW commands
 def setup(bot):
