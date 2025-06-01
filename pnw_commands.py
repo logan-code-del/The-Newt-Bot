@@ -86,17 +86,20 @@ async def nation_command(interaction: discord.Interaction, nation_name: str):
     await interaction.response.defer()
     
     try:
-        # Query nation data with expanded fields
+        # Query nation data with correct fields
         query = kit.query(
             "nations",
             {"first": 1, "nation_name": nation_name},
             "id", "nation_name", "leader_name", "alliance_id", "alliance_position",
             pnwkit.Field("alliance", {}, "id", "name", "acronym"),
             pnwkit.Field("cities", {}, "id", "name"),
-            "score", "color", "vacation_mode_turns", "flag", "founded",
+            "score", "color", "vacation_mode_turns", "flag", "date",  # use date instead of founded
             "last_active", "soldiers", "tanks", "aircraft", "ships", "missiles", "nukes",
-            "discord", "treasures", "continent", "war_policy", "domestic_policy",
-            "population", "gdp", "money", "coal", "oil", "uranium", "iron", "bauxite", "lead",
+            "discord", 
+            pnwkit.Field("treasures", {}, "name"),  # Add sub-selection for treasures
+            "continent", "war_policy", "domestic_policy",
+            "population", # removed gdp as it's not available
+            "money", "coal", "oil", "uranium", "iron", "bauxite", "lead",
             "gasoline", "munitions", "steel", "aluminum", "food"
         )
             
@@ -167,20 +170,18 @@ async def nation_command(interaction: discord.Interaction, nation_name: str):
         # Activity
         last_active = safe_get(nation, "last_active", "Unknown")
         vacation_mode = safe_get(nation, "vacation_mode_turns", 0)
-        founded = safe_get(nation, "founded", "Unknown")
+        founded_date = safe_get(nation, "date", "Unknown")  # Use date instead of founded
             
         activity = time_since(last_active)
         if vacation_mode and int(vacation_mode) > 0:
             activity += f" (Vacation Mode: {vacation_mode} turns)"
             
         embed.add_field(name="Last Active", value=activity, inline=True)
-        embed.add_field(name="Founded", value=time_since(founded), inline=True)
+        embed.add_field(name="Founded", value=time_since(founded_date), inline=True)
         
-        # Population and GDP
+        # Population
         population = safe_get(nation, "population", 0)
-        gdp = safe_get(nation, "gdp", 0)
         embed.add_field(name="Population", value=format_number(population), inline=True)
-        embed.add_field(name="GDP", value=f"${format_number(gdp)}", inline=True)
         
         # Discord
         discord_tag = safe_get(nation, "discord", "Not provided")
@@ -190,8 +191,16 @@ async def nation_command(interaction: discord.Interaction, nation_name: str):
         # Treasures
         treasures = safe_get(nation, "treasures", [])
         if treasures and len(treasures) > 0:
-            treasure_text = ", ".join(treasures) if isinstance(treasures, list) else treasures
-            embed.add_field(name="National Treasures", value=treasure_text, inline=False)
+            # Extract treasure names
+            treasure_names = []
+            for treasure in treasures:
+                treasure_name = safe_get(treasure, "name", "Unknown")
+                if treasure_name:
+                    treasure_names.append(treasure_name)
+                    
+            if treasure_names:
+                treasure_text = ", ".join(treasure_names)
+                embed.add_field(name="National Treasures", value=treasure_text, inline=False)
             
         # Military
         military = (
@@ -243,6 +252,7 @@ async def nation_command(interaction: discord.Interaction, nation_name: str):
         error_message = f"Error looking up nation: {str(e)}"
         print(f"Debug - Nation command error: {error_message}")
         await interaction.followup.send(error_message)
+
 
 
 # Alliance command with pagination
