@@ -24,13 +24,13 @@ class PnWCommands(app_commands.Group):
         """Safely get an attribute from an object or dictionary"""
         if obj is None:
             return default
-        
+            
         # Handle list case
         if isinstance(obj, list):
             if not obj:  # Empty list
                 return default
             obj = obj[0]  # Take first item
-        
+            
         # Try attribute access
         try:
             return getattr(obj, attr)
@@ -44,7 +44,12 @@ class PnWCommands(app_commands.Group):
     # Helper function to format numbers with commas
     @staticmethod
     def format_number(num):
-        return f"{int(num):,}"
+        if num == "N/A":
+            return num
+        try:
+            return f"{int(float(num)):,}"
+        except (ValueError, TypeError):
+            return str(num)
     
     # Helper function to calculate time difference
     @staticmethod
@@ -52,26 +57,26 @@ class PnWCommands(app_commands.Group):
         """Calculate time since a date string"""
         if not date_str:
             return "Unknown"
-        
+            
         # If date_str is a list, try to use the first element
         if isinstance(date_str, list):
             if not date_str:  # Empty list
                 return "Unknown"
             date_str = date_str[0]  # Take the first item
-        
+            
         # Ensure date_str is a string
         date_str = str(date_str)
-        
+            
         try:
             # Handle different date formats
             if 'Z' in date_str:
                 date = datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
             else:
                 date = datetime.datetime.fromisoformat(date_str)
-            
+                
             now = datetime.datetime.now(datetime.timezone.utc)
             diff = now - date
-            
+                
             if diff.days > 0:
                 return f"{diff.days} days ago"
             hours = diff.seconds // 3600
@@ -90,13 +95,15 @@ async def nation_command(interaction: discord.Interaction, nation_name: str):
     await interaction.response.defer()
     
     try:
-        # Query the nation data
-        query = kit.query("nations", {
-            "first": 1,
-            "nation_name": nation_name
-        }, ["id", "nation_name", "leader_name", "alliance_id", "alliance_position", 
-            "alliance{id, name, acronym}", "cities", "score", "color", "vacation_mode_turns",
-            "last_active", "soldiers", "tanks", "aircraft", "ships", "missiles", "nukes"])
+        # Query nation data using the correct syntax
+        query = kit.query(
+            "nations",
+            {"first": 1, "nation_name": nation_name},
+            "id", "nation_name", "leader_name", "alliance_id", "alliance_position",
+            pnwkit.Field("alliance", {}, "id", "name", "acronym"),
+            "cities", "score", "color", "vacation_mode_turns",
+            "last_active", "soldiers", "tanks", "aircraft", "ships", "missiles", "nukes"
+        )
         
         result = await query.get()
         
@@ -110,52 +117,68 @@ async def nation_command(interaction: discord.Interaction, nation_name: str):
         
         # Create embed
         embed = discord.Embed(
-            title=safe_get(nation, "nation_name"),
-            url=f"https://politicsandwar.com/nation/id={safe_get(nation, 'id')}",
+            title=getattr(nation, "nation_name", "Unknown Nation"),
+            url=f"https://politicsandwar.com/nation/id={getattr(nation, 'id', '0')}",
             color=discord.Color.blue()
         )
         
         # Basic info
-        embed.add_field(name="Leader", value=safe_get(nation, "leader_name"), inline=True)
+        leader_name = getattr(nation, "leader_name", "Unknown")
+        embed.add_field(name="Leader", value=leader_name, inline=True)
         
         # Alliance info
-        alliance = safe_get(nation, "alliance")
+        alliance = getattr(nation, "alliance", None)
         alliance_name = "None"
         if alliance:
-            alliance_id = safe_get(alliance, "id")
-            alliance_name = safe_get(alliance, "name")
-            alliance_acronym = safe_get(alliance, "acronym")
-            if alliance_id and alliance_name:
-                alliance_name = f"[{alliance_acronym or ''}] {alliance_name}"
-                alliance_position = safe_get(nation, "alliance_position")
-                if alliance_position:
-                    alliance_name += f" ({alliance_position})"
+            alliance_id = getattr(alliance, "id", "0")
+            alliance_name = getattr(alliance, "name", "Unknown Alliance")
+            alliance_acronym = getattr(alliance, "acronym", "")
+            
+            if alliance_acronym:
+                alliance_display = f"[{alliance_acronym}] {alliance_name}"
+            else:
+                alliance_display = alliance_name
+            
+            alliance_position = getattr(nation, "alliance_position", "Member")
+            alliance_name = f"[{alliance_display}](https://politicsandwar.com/alliance/id={alliance_id}) ({alliance_position})"
         
         embed.add_field(name="Alliance", value=alliance_name, inline=True)
         
-        # Nation stats
-        embed.add_field(name="Score", value=format_number(safe_get(nation, "score")), inline=True)
-        embed.add_field(name="Cities", value=safe_get(nation, "cities"), inline=True)
-        embed.add_field(name="Color", value=safe_get(nation, "color"), inline=True)
+        # Score and cities
+        score = format_number(getattr(nation, "score", 0))
+        cities = getattr(nation, "cities", 0)
+        if isinstance(cities, list):
+            city_count = len(cities)
+        else:
+            city_count = cities
         
-        # Vacation mode
-        vacation_turns = safe_get(nation, "vacation_mode_turns")
-        vacation_status = f"Yes ({vacation_turns} turns left)" if vacation_turns and int(vacation_turns) > 0 else "No"
-        embed.add_field(name="Vacation Mode", value=vacation_status, inline=True)
+        embed.add_field(name="Score", value=score, inline=True)
+        embed.add_field(name="Cities", value=str(city_count), inline=True)
         
-        # Last active
-        last_active = safe_get(nation, "last_active")
-        embed.add_field(name="Last Active", value=time_since(last_active), inline=True)
+        # Color
+        color = getattr(nation, "color", "None")
+        embed.add_field(name="Color", value=color, inline=True)
+        
+        # Activity
+        last_active = getattr(nation, "last_active", "Unknown")
+        vacation_mode = getattr(nation, "vacation_mode_turns", 0)
+        
+        activity = time_since(last_active)
+        if vacation_mode and int(vacation_mode) > 0:
+            activity += f" (Vacation Mode: {vacation_mode} turns)"
+        
+        embed.add_field(name="Last Active", value=activity, inline=True)
         
         # Military
         military = (
-            f"Soldiers: {format_number(safe_get(nation, 'soldiers'))}\n"
-            f"Tanks: {format_number(safe_get(nation, 'tanks'))}\n"
-            f"Aircraft: {format_number(safe_get(nation, 'aircraft'))}\n"
-            f"Ships: {format_number(safe_get(nation, 'ships'))}\n"
-            f"Missiles: {format_number(safe_get(nation, 'missiles'))}\n"
-            f"Nukes: {format_number(safe_get(nation, 'nukes'))}"
+            f"Soldiers: {format_number(getattr(nation, 'soldiers', 0))}\n"
+            f"Tanks: {format_number(getattr(nation, 'tanks', 0))}\n"
+            f"Aircraft: {format_number(getattr(nation, 'aircraft', 0))}\n"
+            f"Ships: {format_number(getattr(nation, 'ships', 0))}\n"
+            f"Missiles: {format_number(getattr(nation, 'missiles', 0))}\n"
+            f"Nukes: {format_number(getattr(nation, 'nukes', 0))}"
         )
+        
         embed.add_field(name="Military", value=military, inline=False)
         
         await interaction.followup.send(embed=embed)
@@ -169,12 +192,13 @@ async def alliance_command(interaction: discord.Interaction, alliance_name: str)
     await interaction.response.defer()
     
     try:
-        # Query the alliance data
-        query = kit.query("alliances", {
-            "first": 1,
-            "name": alliance_name
-        }, ["id", "name", "acronym", "score", "color", "rank", "nations", 
-            "average_score", "discord", "flag"])
+        # Query the alliance data using the correct syntax
+        query = kit.query(
+            "alliances", 
+            {"first": 1, "name": alliance_name},
+            "id", "name", "acronym", "score", "color", "rank", "nations", 
+            "average_score", "discord", "flag"
+        )
         
         result = await query.get()
         
@@ -216,16 +240,18 @@ async def alliance_command(interaction: discord.Interaction, alliance_name: str)
         print(f"Debug - Alliance command error: {error_message}")
         await interaction.followup.send(error_message)
 
+
 # War command
 async def wars_command(interaction: discord.Interaction, nation_name: str):
     await interaction.response.defer()
     
     try:
         # First get the nation ID
-        nation_query = kit.query("nations", {
-            "first": 1,
-            "nation_name": nation_name
-        }, ["id", "nation_name"])
+        nation_query = kit.query(
+            "nations",
+            {"first": 1, "nation_name": nation_name},
+            "id", "nation_name"
+        )
         
         nation_result = await nation_query.get()
         
@@ -239,13 +265,17 @@ async def wars_command(interaction: discord.Interaction, nation_name: str):
         nation_id = safe_get(nation, "id")
         
         # Now query the wars
-        war_query = kit.query("wars", {
-            "first": 10,
-            "active": True,
-            "nation_id": nation_id
-        }, ["id", "date", "winner_id", "attacker{id, nation_name, alliance_id, alliance{name, acronym}}", 
-            "defender{id, nation_name, alliance_id, alliance{name, acronym}}", "attacker_war_policy", 
-            "defender_war_policy", "ground_control", "air_superiority", "naval_blockade", "winner", "turns_left"])
+        war_query = kit.query(
+            "wars",
+            {"first": 10, "active": True, "nation_id": nation_id},
+            "id", "date", "winner_id", 
+            pnwkit.Field("attacker", {}, "id", "nation_name", "alliance_id", 
+                         pnwkit.Field("alliance", {}, "name", "acronym")),
+            pnwkit.Field("defender", {}, "id", "nation_name", "alliance_id", 
+                         pnwkit.Field("alliance", {}, "name", "acronym")),
+            "attacker_war_policy", "defender_war_policy", "ground_control", 
+            "air_superiority", "naval_blockade", "winner", "turns_left"
+        )
         
         war_result = await war_query.get()
         
@@ -343,16 +373,27 @@ async def wars_command(interaction: discord.Interaction, nation_name: str):
         await interaction.followup.send(error_message)
 
 
+
 # City command
 async def city_command(interaction: discord.Interaction, nation_name: str, city_name: Optional[str] = None):
     await interaction.response.defer()
     
     try:
         # First get the nation ID
-        nation_query = kit.query("nations", {
-            "first": 1,
-            "nation_name": nation_name
-        }, ["id", "nation_name", "cities{id, name, infrastructure, land, powered, oil_power, wind_power, coal_power, nuclear_power, coal_mine, oil_well, uranium_mine, iron_mine, lead_mine, bauxite_mine, farm, police_station, hospital, recycling_center, subway, supermarket, bank, shopping_mall, stadium, barracks, factory, hangar, drydock, date}"])
+        nation_query = kit.query(
+            "nations",
+            {"first": 1, "nation_name": nation_name},
+            "id", "nation_name", 
+            pnwkit.Field("cities", {}, 
+                "id", "name", "infrastructure", "land", "powered", 
+                "oil_power", "wind_power", "coal_power", "nuclear_power", 
+                "coal_mine", "oil_well", "uranium_mine", "iron_mine", 
+                "lead_mine", "bauxite_mine", "farm", "police_station", 
+                "hospital", "recycling_center", "subway", "supermarket", 
+                "bank", "shopping_mall", "stadium", "barracks", "factory", 
+                "hangar", "drydock", "date"
+            )
+        )
         
         nation_result = await nation_query.get()
         
@@ -481,37 +522,33 @@ async def city_command(interaction: discord.Interaction, nation_name: str, city_
         # If there are more cities than we displayed
         if len(cities) > 5:
             embed.set_footer(text=f"Showing 5 of {len(cities)} cities. Use /pnw city {nation_name} [city_name] to see a specific city.")
-        
-        await interaction.followup.send(embed=embed)
-    except Exception as e:
-        error_message = f"Error looking up city: {str(e)}"
-        print(f"Debug - City command error: {error_message}")
-        await interaction.followup.send(error_message)
 
 
 
+# Prices command
 async def prices_command(interaction: discord.Interaction):
     await interaction.response.defer()
     
     try:
-        # Query trade prices
-        query = kit.query("trade_prices", {}, ["coal", "oil", "uranium", "iron", "bauxite", "lead", "gasoline", 
-                                              "munitions", "steel", "aluminum", "food", "credits"])
+        # Query trade prices using the correct syntax
+        query = kit.query(
+            "trade_prices",
+            {},
+            "coal", "oil", "uranium", "iron", "bauxite", "lead", 
+            "gasoline", "munitions", "steel", "aluminum", "food", "credits"
+        )
         
         result = await query.get()
         
-        # Handle list or empty result
-        prices = result.trade_prices
-        if not prices:
+        # Handle empty result
+        if not result.trade_prices:
             await interaction.followup.send("Could not retrieve trade prices.")
             return
         
-        # Handle list case
-        if isinstance(prices, list):
-            if not prices:
-                await interaction.followup.send("Could not retrieve trade prices (empty list).")
-                return
-            prices = prices[0]  # Take the first item
+        # Get the first item if it's a list
+        prices = result.trade_prices
+        if isinstance(prices, list) and prices:
+            prices = prices[0]
         
         # Create embed
         embed = discord.Embed(
@@ -522,27 +559,27 @@ async def prices_command(interaction: discord.Interaction):
         
         # Resources
         resources = (
-            f"Coal: ${format_number(safe_get(prices, 'coal'))}\n"
-            f"Oil: ${format_number(safe_get(prices, 'oil'))}\n"
-            f"Uranium: ${format_number(safe_get(prices, 'uranium'))}\n"
-            f"Iron: ${format_number(safe_get(prices, 'iron'))}\n"
-            f"Bauxite: ${format_number(safe_get(prices, 'bauxite'))}\n"
-            f"Lead: ${format_number(safe_get(prices, 'lead'))}"
+            f"Coal: ${format_number(getattr(prices, 'coal', 'N/A'))}\n"
+            f"Oil: ${format_number(getattr(prices, 'oil', 'N/A'))}\n"
+            f"Uranium: ${format_number(getattr(prices, 'uranium', 'N/A'))}\n"
+            f"Iron: ${format_number(getattr(prices, 'iron', 'N/A'))}\n"
+            f"Bauxite: ${format_number(getattr(prices, 'bauxite', 'N/A'))}\n"
+            f"Lead: ${format_number(getattr(prices, 'lead', 'N/A'))}"
         )
         embed.add_field(name="Raw Resources", value=resources, inline=True)
         
         # Manufactured goods
         manufactured = (
-            f"Gasoline: ${format_number(safe_get(prices, 'gasoline'))}\n"
-            f"Munitions: ${format_number(safe_get(prices, 'munitions'))}\n"
-            f"Steel: ${format_number(safe_get(prices, 'steel'))}\n"
-            f"Aluminum: ${format_number(safe_get(prices, 'aluminum'))}\n"
-            f"Food: ${format_number(safe_get(prices, 'food'))}"
+            f"Gasoline: ${format_number(getattr(prices, 'gasoline', 'N/A'))}\n"
+            f"Munitions: ${format_number(getattr(prices, 'munitions', 'N/A'))}\n"
+            f"Steel: ${format_number(getattr(prices, 'steel', 'N/A'))}\n"
+            f"Aluminum: ${format_number(getattr(prices, 'aluminum', 'N/A'))}\n"
+            f"Food: ${format_number(getattr(prices, 'food', 'N/A'))}"
         )
         embed.add_field(name="Manufactured Goods", value=manufactured, inline=True)
         
         # Credits
-        embed.add_field(name="Credits", value=f"${format_number(safe_get(prices, 'credits'))}", inline=False)
+        embed.add_field(name="Credits", value=f"${format_number(getattr(prices, 'credits', 'N/A'))}", inline=False)
         
         await interaction.followup.send(embed=embed)
     except Exception as e:
@@ -556,10 +593,12 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
     
     try:
         # First get the nation ID
-        nation_query = kit.query("nations", {
-            "first": 1,
-            "nation_name": nation_name
-        }, ["id", "nation_name", "alliance_id", "alliance{name, acronym}"])
+        nation_query = kit.query(
+            "nations",
+            {"first": 1, "nation_name": nation_name},
+            "id", "nation_name", "alliance_id", 
+            pnwkit.Field("alliance", {}, "name", "acronym")
+        )
         
         nation_result = await nation_query.get()
         
@@ -579,11 +618,14 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
             return
         
         # Query bank records
-        bank_query = kit.query("banks", {
-            "alliance_id": alliance_id,
-            "receiver_id": nation_id
-        }, ["id", "date", "money", "coal", "oil", "uranium", "iron", "bauxite", "lead", "gasoline", 
-            "munitions", "steel", "aluminum", "food", "sender{id, nation_name}", "note"])
+        bank_query = kit.query(
+            "banks",
+            {"alliance_id": alliance_id, "receiver_id": nation_id},
+            "id", "date", "money", "coal", "oil", "uranium", "iron", "bauxite", "lead", "gasoline",
+            "munitions", "steel", "aluminum", "food", 
+            pnwkit.Field("sender", {}, "id", "nation_name"), 
+            "note"
+        )
         
         bank_result = await bank_query.get()
         
@@ -627,8 +669,8 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
                 if money and float(money) != 0:
                     resources.append(f"${format_number(money)}")
                 
-                for resource in ["coal", "oil", "uranium", "iron", "bauxite", "lead", 
-                                "gasoline", "munitions", "steel", "aluminum", "food"]:
+                for resource in ["coal", "oil", "uranium", "iron", "bauxite", "lead",
+                                 "gasoline", "munitions", "steel", "aluminum", "food"]:
                     amount = safe_get(bank, resource)
                     if amount and float(amount) != 0:
                         resources.append(f"{format_number(amount)} {resource.capitalize()}")
@@ -660,8 +702,8 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
             if money and float(money) != 0:
                 resources.append(f"${format_number(money)}")
             
-            for resource in ["coal", "oil", "uranium", "iron", "bauxite", "lead", 
-                            "gasoline", "munitions", "steel", "aluminum", "food"]:
+            for resource in ["coal", "oil", "uranium", "iron", "bauxite", "lead",
+                             "gasoline", "munitions", "steel", "aluminum", "food"]:
                 amount = safe_get(banks, resource)
                 if amount and float(amount) != 0:
                     resources.append(f"{format_number(amount)} {resource.capitalize()}")
@@ -694,51 +736,21 @@ async def radiation_command(interaction: discord.Interaction):
     await interaction.response.defer()
     
     try:
-        # Query global data
-        query = kit.query("game_info", {}, ["radiation{global}"])
+        # Query global data using the correct syntax
+        query = kit.query(
+            "game_info",
+            {},
+            pnwkit.Field("radiation", {}, "global")
+        )
         
         result = await query.get()
         
-        if not result.game_info:
+        if not result.game_info or not result.game_info.radiation:
             await interaction.followup.send("Could not retrieve radiation data.")
             return
         
-        # Debug information
-        print(f"Debug - game_info type: {type(result.game_info)}")
-        if hasattr(result.game_info, 'radiation'):
-            print(f"Debug - radiation type: {type(result.game_info.radiation)}")
-            print(f"Debug - radiation content: {result.game_info.radiation}")
-        
-        # Get radiation data safely
-        radiation = None
-        
-        # Try different ways to access the radiation data
-        if hasattr(result.game_info, 'radiation'):
-            radiation_data = result.game_info.radiation
-            
-            # Case 1: radiation is a list
-            if isinstance(radiation_data, list):
-                if radiation_data:  # Non-empty list
-                    first_item = radiation_data[0]
-                    # Try to get 'global' from the first item
-                    if hasattr(first_item, 'global'):
-                        radiation = getattr(first_item, 'global')
-                    elif isinstance(first_item, dict) and 'global' in first_item:
-                        radiation = first_item['global']
-            
-            # Case 2: radiation is an object with 'global' attribute
-            elif hasattr(radiation_data, 'global'):
-                radiation = getattr(radiation_data, 'global')
-            
-            # Case 3: radiation is a dictionary with 'global' key
-            elif isinstance(radiation_data, dict) and 'global' in radiation_data:
-                radiation = radiation_data['global']
-        
-        if radiation is None:
-            # Last resort - try to parse the raw data
-            print(f"Debug - Could not parse radiation data")
-            await interaction.followup.send("Could not parse radiation data. Please check the logs.")
-            return
+        # Get the radiation value
+        radiation = result.game_info.radiation.global
         
         # Create embed
         embed = discord.Embed(
@@ -826,6 +838,71 @@ async def set_api_key_command(interaction: discord.Interaction, api_key: str):
         print(f"Debug - Set API key command error: {error_message}")
         await interaction.followup.send(error_message, ephemeral=True)
 
+# Debug command to test pnwkit queries
+async def debug_query_command(interaction: discord.Interaction, query_type: str):
+    await interaction.response.defer(ephemeral=True)
+    
+    try:
+        result = None
+        query_info = f"Testing query type: {query_type}"
+        
+        if query_type == "radiation":
+            query = kit.query(
+                "game_info",
+                {},
+                pnwkit.Field("radiation", {}, "global")
+            )
+            result = await query.get()
+            
+        elif query_type == "prices":
+            query = kit.query(
+                "trade_prices",
+                {},
+                "coal", "oil", "uranium", "iron", "bauxite", "lead",
+                "gasoline", "munitions", "steel", "aluminum", "food", "credits"
+            )
+            result = await query.get()
+            
+        elif query_type == "nation":
+            query = kit.query(
+                "nations",
+                {"first": 1},
+                "id", "nation_name", "leader_name"
+            )
+            result = await query.get()
+            
+        elif query_type == "alliance":
+            query = kit.query(
+                "alliances",
+                {"first": 1},
+                "id", "name", "acronym"
+            )
+            result = await query.get()
+            
+        else:
+            await interaction.followup.send(f"Unknown query type: {query_type}")
+            return
+        
+        # Debug info
+        debug_info = []
+        debug_info.append(query_info)
+        debug_info.append(f"Result type: {type(result)}")
+        debug_info.append(f"Result attributes: {dir(result)[:20]}")
+        
+        if result:
+            debug_info.append(f"Raw result: {str(result)[:1000]}")
+        
+        # Send debug info
+        debug_text = "\n".join(debug_info)
+        await interaction.followup.send(f"```{debug_text}```")
+        
+    except Exception as e:
+        error_message = f"Debug query error: {str(e)}"
+        print(f"Debug command error: {error_message}")
+        import traceback
+        await interaction.followup.send(f"Error: {error_message}\n```{traceback.format_exc()[:1500]}```")
+
+
 # Function to register all PnW commands
 def setup(bot):
     # Create a command group for PnW commands
@@ -880,6 +957,11 @@ def setup(bot):
         callback=set_api_key_command
     ))
     
+    pnw_group.add_command(app_commands.Command(
+        name="debug",
+        description="Debug pnwkit queries",
+        callback=debug_query_command
+    ))
     # Add the group to the command tree
     bot.tree.add_command(pnw_group)
     
