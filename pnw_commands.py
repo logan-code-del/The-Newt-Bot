@@ -190,7 +190,7 @@ async def alliance_command(interaction: discord.Interaction, alliance_name: str)
             "alliances", 
             {"first": 1, "name": alliance_name},
             "id", "name", "acronym", "score", "color", "rank", "nations", 
-            "average_score", "discord", "flag"
+            "average_score", "discord_link", "flag"
         )
         
         result = await query.get_async()
@@ -265,9 +265,8 @@ async def wars_command(interaction: discord.Interaction, nation_name: str):
             pnwkit.Field("attacker", {}, "id", "nation_name", "alliance_id",
                          pnwkit.Field("alliance", {}, "name", "acronym")),
             pnwkit.Field("defender", {}, "id", "nation_name", "alliance_id",
-                         pnwkit.Field("alliance", {}, "name", "acronym")),
-            "attacker_war_policy", "defender_war_policy", "ground_control", 
-            "air_superiority", "naval_blockade", "winner", "turns_left"
+                         pnwkit.Field("alliance", {}, "name", "acronym")), 
+            "ground_control", "air_superiority", "naval_blockade", "winner", "turns_left"
         )
             
         war_result = await war_query.get_async()
@@ -535,7 +534,7 @@ async def prices_command(interaction: discord.Interaction):
             "gasoline", "munitions", "steel", "aluminum", "food", "credits"
         )
         
-        result = await query.get()
+        result = await query.get_async()
         
         # Handle empty result
         if not result.tradeprices:
@@ -597,7 +596,7 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
             pnwkit.Field("alliance", {}, "name", "acronym")
         )
         
-        nation_result = await nation_query.get()
+        nation_result = await nation_query.get_async()
         
         # Handle list or empty result
         nations = nation_result.nations
@@ -624,7 +623,7 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
             "note"
         )
         
-        bank_result = await bank_query.get()
+        bank_result = await bank_query.get_async()
         
         # Handle list or empty result
         banks = bank_result.banks
@@ -740,7 +739,7 @@ async def radiation_command(interaction: discord.Interaction):
             pnwkit.Field("radiation", {}, "global")
         )
         
-        result = await query.get()
+        result = await query.get_async()
         
         # Handle empty result
         if not result or not hasattr(result, "game_info"):
@@ -864,7 +863,7 @@ async def debug_query_command(interaction: discord.Interaction, query_type: str)
                 {},
                 pnwkit.Field("radiation", {}, "global")
             )
-            result = await query.get()
+            result = await query.get_async()
             
         elif query_type == "prices":
             query = kit.query(
