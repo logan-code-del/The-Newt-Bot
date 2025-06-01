@@ -13,81 +13,75 @@ API_KEY = os.environ.get('PNW_API_KEY', '')
 # Initialize the PnWKit client with the API key
 kit = pnwkit.QueryKit(api_key=API_KEY)
 
+def safe_get(obj, attr, default="N/A"):
+    """Safely get an attribute from an object or dictionary"""
+    if obj is None:
+        return default
+        
+    # Handle list case
+    if isinstance(obj, list):
+        if not obj:  # Empty list
+            return default
+        obj = obj[0]  # Take first item
+        
+    # Try attribute access
+    try:
+        return getattr(obj, attr)
+    except (AttributeError, TypeError):
+        # Try dictionary access
+        try:
+            return obj[attr]
+        except (KeyError, TypeError):
+            return default
+
+def format_number(num):
+    if num == "N/A":
+        return num
+    try:
+        return f"{int(float(num)):,}"
+    except (ValueError, TypeError):
+        return str(num)
+
+def time_since(date_str):
+    """Calculate time since a date string"""
+    if not date_str:
+        return "Unknown"
+        
+    # If date_str is a list, try to use the first element
+    if isinstance(date_str, list):
+        if not date_str:  # Empty list
+            return "Unknown"
+        date_str = date_str[0]  # Take the first item
+        
+    # Ensure date_str is a string
+    date_str = str(date_str)
+        
+    try:
+        # Handle different date formats
+        if 'Z' in date_str:
+            date = datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        else:
+            date = datetime.datetime.fromisoformat(date_str)
+            
+        now = datetime.datetime.now(datetime.timezone.utc)
+        diff = now - date
+            
+        if diff.days > 0:
+            return f"{diff.days} days ago"
+        hours = diff.seconds // 3600
+        if hours > 0:
+            return f"{hours} hours ago"
+        minutes = (diff.seconds % 3600) // 60
+        return f"{minutes} minutes ago"
+    except Exception as e:
+        print(f"Error parsing date: {e}, date_str: {date_str}, type: {type(date_str)}")
+        return "Unknown"
+
 # Create a group for PnW commands
 class PnWCommands(app_commands.Group):
     def __init__(self):
         super().__init__(name="pnw", description="Politics & War commands")
-
-    # Helper function to safely access data
-    @staticmethod
-    def safe_get(obj, attr, default="N/A"):
-        """Safely get an attribute from an object or dictionary"""
-        if obj is None:
-            return default
-            
-        # Handle list case
-        if isinstance(obj, list):
-            if not obj:  # Empty list
-                return default
-            obj = obj[0]  # Take first item
-            
-        # Try attribute access
-        try:
-            return getattr(obj, attr)
-        except (AttributeError, TypeError):
-            # Try dictionary access
-            try:
-                return obj[attr]
-            except (KeyError, TypeError):
-                return default
-        
-    # Helper function to format numbers with commas
-    @staticmethod
-    def format_number(num):
-        if num == "N/A":
-            return num
-        try:
-            return f"{int(float(num)):,}"
-        except (ValueError, TypeError):
-            return str(num)
     
-    # Helper function to calculate time difference
-    @staticmethod
-    def time_since(date_str):
-        """Calculate time since a date string"""
-        if not date_str:
-            return "Unknown"
-            
-        # If date_str is a list, try to use the first element
-        if isinstance(date_str, list):
-            if not date_str:  # Empty list
-                return "Unknown"
-            date_str = date_str[0]  # Take the first item
-            
-        # Ensure date_str is a string
-        date_str = str(date_str)
-            
-        try:
-            # Handle different date formats
-            if 'Z' in date_str:
-                date = datetime.datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-            else:
-                date = datetime.datetime.fromisoformat(date_str)
-                
-            now = datetime.datetime.now(datetime.timezone.utc)
-            diff = now - date
-                
-            if diff.days > 0:
-                return f"{diff.days} days ago"
-            hours = diff.seconds // 3600
-            if hours > 0:
-                return f"{hours} hours ago"
-            minutes = (diff.seconds % 3600) // 60
-            return f"{minutes} minutes ago"
-        except Exception as e:
-            print(f"Error parsing date: {e}, date_str: {date_str}, type: {type(date_str)}")
-            return "Unknown"
-
 
 
 # Nation command
@@ -101,91 +95,90 @@ async def nation_command(interaction: discord.Interaction, nation_name: str):
             {"first": 1, "nation_name": nation_name},
             "id", "nation_name", "leader_name", "alliance_id", "alliance_position",
             pnwkit.Field("alliance", {}, "id", "name", "acronym"),
-            "cities", "score", "color", "vacation_mode_turns",
+            pnwkit.Field("cities", {}, "id", "name"),  # Specify which city fields you want
+            "score", "color", "vacation_mode_turns",
             "last_active", "soldiers", "tanks", "aircraft", "ships", "missiles", "nukes"
         )
-        
+            
         result = await query.get_async()
-        
+            
         # Handle list or empty result
         nations = result.nations
         if not nations:
             await interaction.followup.send(f"Nation '{nation_name}' not found.")
             return
-        
+            
         nation = nations[0] if isinstance(nations, list) else nations
-        
+            
         # Create embed
         embed = discord.Embed(
-            title=getattr(nation, "nation_name", "Unknown Nation"),
-            url=f"https://politicsandwar.com/nation/id={getattr(nation, 'id', '0')}",
+            title=safe_get(nation, "nation_name", "Unknown Nation"),
+            url=f"https://politicsandwar.com/nation/id={safe_get(nation, 'id', '0')}",
             color=discord.Color.blue()
         )
-        
+            
         # Basic info
-        leader_name = getattr(nation, "leader_name", "Unknown")
+        leader_name = safe_get(nation, "leader_name", "Unknown")
         embed.add_field(name="Leader", value=leader_name, inline=True)
-        
+            
         # Alliance info
-        alliance = getattr(nation, "alliance", None)
+        alliance = safe_get(nation, "alliance", None)
         alliance_name = "None"
         if alliance:
-            alliance_id = getattr(alliance, "id", "0")
-            alliance_name = getattr(alliance, "name", "Unknown Alliance")
-            alliance_acronym = getattr(alliance, "acronym", "")
-            
+            alliance_id = safe_get(alliance, "id", "0")
+            alliance_name = safe_get(alliance, "name", "Unknown Alliance")
+            alliance_acronym = safe_get(alliance, "acronym", "")
+                
             if alliance_acronym:
                 alliance_display = f"[{alliance_acronym}] {alliance_name}"
             else:
                 alliance_display = alliance_name
-            
-            alliance_position = getattr(nation, "alliance_position", "Member")
+                
+            alliance_position = safe_get(nation, "alliance_position", "Member")
             alliance_name = f"[{alliance_display}](https://politicsandwar.com/alliance/id={alliance_id}) ({alliance_position})"
-        
+            
         embed.add_field(name="Alliance", value=alliance_name, inline=True)
-        
+            
         # Score and cities
-        score = format_number(getattr(nation, "score", 0))
-        cities = getattr(nation, "cities", 0)
-        if isinstance(cities, list):
-            city_count = len(cities)
-        else:
-            city_count = cities
-        
+        score = format_number(safe_get(nation, "score", 0))
+        cities = safe_get(nation, "cities", [])
+        city_count = len(cities) if isinstance(cities, list) else 0
+            
         embed.add_field(name="Score", value=score, inline=True)
         embed.add_field(name="Cities", value=str(city_count), inline=True)
-        
+            
         # Color
-        color = getattr(nation, "color", "None")
+        color = safe_get(nation, "color", "None")
         embed.add_field(name="Color", value=color, inline=True)
-        
+            
         # Activity
-        last_active = getattr(nation, "last_active", "Unknown")
-        vacation_mode = getattr(nation, "vacation_mode_turns", 0)
-        
+        last_active = safe_get(nation, "last_active", "Unknown")
+        vacation_mode = safe_get(nation, "vacation_mode_turns", 0)
+            
         activity = time_since(last_active)
         if vacation_mode and int(vacation_mode) > 0:
             activity += f" (Vacation Mode: {vacation_mode} turns)"
-        
+            
         embed.add_field(name="Last Active", value=activity, inline=True)
-        
+            
         # Military
         military = (
-            f"Soldiers: {format_number(getattr(nation, 'soldiers', 0))}\n"
-            f"Tanks: {format_number(getattr(nation, 'tanks', 0))}\n"
-            f"Aircraft: {format_number(getattr(nation, 'aircraft', 0))}\n"
-            f"Ships: {format_number(getattr(nation, 'ships', 0))}\n"
-            f"Missiles: {format_number(getattr(nation, 'missiles', 0))}\n"
-            f"Nukes: {format_number(getattr(nation, 'nukes', 0))}"
+            f"Soldiers: {format_number(safe_get(nation, 'soldiers', 0))}\n"
+            f"Tanks: {format_number(safe_get(nation, 'tanks', 0))}\n"
+            f"Aircraft: {format_number(safe_get(nation, 'aircraft', 0))}\n"
+            f"Ships: {format_number(safe_get(nation, 'ships', 0))}\n"
+            f"Missiles: {format_number(safe_get(nation, 'missiles', 0))}\n"
+            f"Nukes: {format_number(safe_get(nation, 'nukes', 0))}"
         )
-        
+            
         embed.add_field(name="Military", value=military, inline=False)
-        
+            
         await interaction.followup.send(embed=embed)
     except Exception as e:
         error_message = f"Error looking up nation: {str(e)}"
         print(f"Debug - Nation command error: {error_message}")
         await interaction.followup.send(error_message)
+
 
 # Alliance command
 async def alliance_command(interaction: discord.Interaction, alliance_name: str):
@@ -260,23 +253,23 @@ async def wars_command(interaction: discord.Interaction, nation_name: str):
         if not nations:
             await interaction.followup.send(f"Nation '{nation_name}' not found.")
             return
-        
+            
         nation = nations[0] if isinstance(nations, list) else nations
         nation_id = safe_get(nation, "id")
-        
+            
         # Now query the wars
         war_query = kit.query(
             "wars",
             {"first": 10, "active": True, "nation_id": nation_id},
             "id", "date", "winner_id", 
-            pnwkit.Field("attacker", {}, "id", "nation_name", "alliance_id", 
+            pnwkit.Field("attacker", {}, "id", "nation_name", "alliance_id",
                          pnwkit.Field("alliance", {}, "name", "acronym")),
-            pnwkit.Field("defender", {}, "id", "nation_name", "alliance_id", 
+            pnwkit.Field("defender", {}, "id", "nation_name", "alliance_id",
                          pnwkit.Field("alliance", {}, "name", "acronym")),
             "attacker_war_policy", "defender_war_policy", "ground_control", 
             "air_superiority", "naval_blockade", "winner", "turns_left"
         )
-        
+            
         war_result = await war_query.get_async()
         
         # Handle list or empty result
@@ -536,13 +529,13 @@ async def prices_command(interaction: discord.Interaction):
     try:
         # Query trade prices using the correct syntax
         query = kit.query(
-            "tradeprices",
+            "tradeprices",  # This is the correct endpoint name
             {},
             "coal", "oil", "uranium", "iron", "bauxite", "lead", 
             "gasoline", "munitions", "steel", "aluminum", "food", "credits"
         )
         
-        result = await query.get_async()
+        result = await query.get()
         
         # Handle empty result
         if not result.tradeprices:
@@ -563,27 +556,27 @@ async def prices_command(interaction: discord.Interaction):
         
         # Resources
         resources = (
-            f"Coal: ${format_number(getattr(prices, 'coal', 'N/A'))}\n"
-            f"Oil: ${format_number(getattr(prices, 'oil', 'N/A'))}\n"
-            f"Uranium: ${format_number(getattr(prices, 'uranium', 'N/A'))}\n"
-            f"Iron: ${format_number(getattr(prices, 'iron', 'N/A'))}\n"
-            f"Bauxite: ${format_number(getattr(prices, 'bauxite', 'N/A'))}\n"
-            f"Lead: ${format_number(getattr(prices, 'lead', 'N/A'))}"
+            f"Coal: ${format_number(safe_get(prices, 'coal', 'N/A'))}\n"
+            f"Oil: ${format_number(safe_get(prices, 'oil', 'N/A'))}\n"
+            f"Uranium: ${format_number(safe_get(prices, 'uranium', 'N/A'))}\n"
+            f"Iron: ${format_number(safe_get(prices, 'iron', 'N/A'))}\n"
+            f"Bauxite: ${format_number(safe_get(prices, 'bauxite', 'N/A'))}\n"
+            f"Lead: ${format_number(safe_get(prices, 'lead', 'N/A'))}"
         )
         embed.add_field(name="Raw Resources", value=resources, inline=True)
         
         # Manufactured goods
         manufactured = (
-            f"Gasoline: ${format_number(getattr(prices, 'gasoline', 'N/A'))}\n"
-            f"Munitions: ${format_number(getattr(prices, 'munitions', 'N/A'))}\n"
-            f"Steel: ${format_number(getattr(prices, 'steel', 'N/A'))}\n"
-            f"Aluminum: ${format_number(getattr(prices, 'aluminum', 'N/A'))}\n"
-            f"Food: ${format_number(getattr(prices, 'food', 'N/A'))}"
+            f"Gasoline: ${format_number(safe_get(prices, 'gasoline', 'N/A'))}\n"
+            f"Munitions: ${format_number(safe_get(prices, 'munitions', 'N/A'))}\n"
+            f"Steel: ${format_number(safe_get(prices, 'steel', 'N/A'))}\n"
+            f"Aluminum: ${format_number(safe_get(prices, 'aluminum', 'N/A'))}\n"
+            f"Food: ${format_number(safe_get(prices, 'food', 'N/A'))}"
         )
         embed.add_field(name="Manufactured Goods", value=manufactured, inline=True)
         
         # Credits
-        embed.add_field(name="Credits", value=f"${format_number(getattr(prices, 'credits', 'N/A'))}", inline=False)
+        embed.add_field(name="Credits", value=f"${format_number(safe_get(prices, 'credits', 'N/A'))}", inline=False)
         
         await interaction.followup.send(embed=embed)
     except Exception as e:
@@ -754,11 +747,17 @@ async def radiation_command(interaction: discord.Interaction):
             await interaction.followup.send("Could not retrieve radiation information.")
             return
         
-        # Access the radiation data safely
+        # Access the radiation data safely using dictionary-style access for the reserved keyword
         radiation_value = None
         if hasattr(result.game_info, "radiation"):
-            if hasattr(result.game_info.radiation, "global"):
-                radiation_value = result.game_info.radiation["global"]
+            radiation_value = getattr(result.game_info.radiation, "global", None)
+            
+            # If that doesn't work, try dictionary access
+            if radiation_value is None:
+                try:
+                    radiation_value = result.game_info.radiation["global"]
+                except (KeyError, TypeError):
+                    pass
         
         if radiation_value is None:
             await interaction.followup.send("Could not retrieve radiation information.")
