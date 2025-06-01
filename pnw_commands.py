@@ -190,9 +190,10 @@ async def alliance_command(interaction: discord.Interaction, alliance_name: str)
             "alliances", 
             {"first": 1, "name": alliance_name},
             "id", "name", "acronym", "score", "color", "rank", 
-            "nations_count", "average_score", "discord_link", "flag",
+            "average_score", "discord_link", "flag",
             pnwkit.Field("nations", {}, 
-                "id", "nation_name", "leader_name", "score", "cities", 
+                "id", "nation_name", "leader_name", "score", 
+                pnwkit.Field("cities", {}, "id"),  # Just query city IDs to count them
                 "vacation_mode_turns", "color", "last_active"
             )
         )
@@ -269,7 +270,7 @@ class AlliancePaginator(discord.ui.View):
         embed.add_field(name="Score", value=format_number(safe_get(alliance, "score")), inline=True)
         embed.add_field(name="Rank", value=safe_get(alliance, "rank"), inline=True)
         embed.add_field(name="Color", value=safe_get(alliance, "color"), inline=True)
-        embed.add_field(name="Nations", value=safe_get(alliance, "nations_count"), inline=True)
+        embed.add_field(name="Nations", value=str(len(self.nations)), inline=True)
         embed.add_field(name="Average Score", value=format_number(safe_get(alliance, "average_score")), inline=True)
         
         # Discord link if available
@@ -301,8 +302,10 @@ class AlliancePaginator(discord.ui.View):
             nation_id = safe_get(nation, "id")
             leader_name = safe_get(nation, "leader_name")
             score = format_number(safe_get(nation, "score"))
-            cities = safe_get(nation, "cities")
-            city_count = len(cities) if isinstance(cities, list) else cities
+            
+            # Count cities
+            cities = safe_get(nation, "cities", [])
+            city_count = len(cities) if isinstance(cities, list) else 0
             
             # Check vacation mode
             vacation = safe_get(nation, "vacation_mode_turns")
