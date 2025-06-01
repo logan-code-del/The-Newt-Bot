@@ -893,7 +893,7 @@ async def radiation_command(interaction: discord.Interaction):
             if hasattr(result.game_info, "radiation"):
                 # Try direct attribute access
                 if hasattr(result.game_info.radiation, "global"):
-                    radiation_value = result.game_info.radiation.global
+                    radiation_value = result.game_info.radiation["global"]
                 # Try dictionary-style access
                 elif hasattr(result.game_info.radiation, "__getitem__"):
                     radiation_value = result.game_info.radiation["global"]
