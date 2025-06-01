@@ -523,8 +523,12 @@ async def city_command(interaction: discord.Interaction, nation_name: str, city_
         if len(cities) > 5:
             embed.set_footer(text=f"Showing 5 of {len(cities)} cities. Use /pnw city {nation_name} [city_name] to see a specific city.")
 
-
-
+        await interaction.followup.send(embed=embed)
+    except Exception as e:
+        error_message = f"Error looking up city: {str(e)}"
+        print(f"Debug - City command error: {error_message}")
+        await interaction.followup.send(error_message)
+        
 # Prices command
 async def prices_command(interaction: discord.Interaction):
     await interaction.response.defer()
