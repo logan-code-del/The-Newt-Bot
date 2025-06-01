@@ -713,7 +713,6 @@ async def prices_command(interaction: discord.Interaction):
         print(f"Debug - Price command error: {error_message}")
         await interaction.followup.send(error_message)
 
-# Bank command
 async def bank_command(interaction: discord.Interaction, nation_name: str):
     await interaction.response.defer()
     
@@ -743,24 +742,57 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
             await interaction.followup.send(f"Nation '{nation_name}' is not in an alliance.")
             return
         
-        # Query bank records with updated parameters
-        bank_query = kit.query(
-            "bankrecs",
-            {
-                "nation_id": nation_id,  # Use nation_id instead of receiver_id
-                # No alliance_id parameter needed
-                "first": 10  # Limit to 10 records
-            },
-            "id", "date", "money", "coal", "oil", "uranium", "iron", "bauxite", "lead", "gasoline",
-            "munitions", "steel", "aluminum", "food", 
-            pnwkit.Field("sender", {}, "id", "nation_name"),
-            "note"
-        )
-        
-        bank_result = await bank_query.get_async()
+        # Let's try to debug the available parameters for bankrecs
+        try:
+            # First, let's try a simple query without filters to see what we get
+            debug_query = kit.query(
+                "bankrecs",
+                {"first": 5},  # Just get a few records
+                "id", "date", "sender_id", "receiver_id", "banker_id", "note"
+            )
+            
+            debug_result = await debug_query.get_async()
+            print(f"Debug bankrecs result: {debug_result}")
+            
+            # Now let's try with the receiver_id filter
+            bank_query = kit.query(
+                "bankrecs",
+                {
+                    "first": 10,  # Limit to 10 records
+                    "receiver_id": nation_id  # Try using receiver_id
+                },
+                "id", "date", "money", "coal", "oil", "uranium", "iron", "bauxite", "lead", "gasoline",
+                "munitions", "steel", "aluminum", "food", 
+                pnwkit.Field("sender", {}, "id", "nation_name"),
+                "note"
+            )
+            
+            bank_result = await bank_query.get_async()
+        except Exception as e:
+            # If that fails, try without filters
+            print(f"Error with receiver_id filter: {e}")
+            bank_query = kit.query(
+                "bankrecs",
+                {"first": 20},  # Get more records so we can filter client-side
+                "id", "date", "money", "coal", "oil", "uranium", "iron", "bauxite", "lead", "gasoline",
+                "munitions", "steel", "aluminum", "food", 
+                pnwkit.Field("sender", {}, "id", "nation_name"),
+                "receiver_id",  # Include receiver_id so we can filter
+                "note"
+            )
+            
+            bank_result = await bank_query.get_async()
+            
+            # Filter client-side
+            if hasattr(bank_result, "bankrecs"):
+                bankrecs = bank_result.bankrecs
+                if isinstance(bankrecs, list):
+                    bankrecs = [rec for rec in bankrecs if safe_get(rec, "receiver_id") == nation_id]
+                elif safe_get(bankrecs, "receiver_id") != nation_id:
+                    bankrecs = []
         
         # Handle list or empty result
-        bankrecs = bank_result.bankrecs
+        bankrecs = bank_result.bankrecs if hasattr(bank_result, "bankrecs") else []
         if not bankrecs or (isinstance(bankrecs, list) and len(bankrecs) == 0):
             await interaction.followup.send(f"No bank records found for '{nation_name}'.")
             return
@@ -858,6 +890,12 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
     except Exception as e:
         error_message = f"Error looking up bank records: {str(e)}"
         print(f"Debug - Bank command error: {error_message}")
+        
+        # Add more detailed error information
+        import traceback
+        traceback_str = traceback.format_exc()
+        print(f"Traceback: {traceback_str}")
+        
         await interaction.followup.send(error_message)
 
 async def radiation_command(interaction: discord.Interaction):
