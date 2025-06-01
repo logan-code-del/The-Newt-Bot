@@ -758,7 +758,7 @@ async def radiation_command(interaction: discord.Interaction):
         radiation_value = None
         if hasattr(result.game_info, "radiation"):
             if hasattr(result.game_info.radiation, "global"):
-                radiation_value = result.game_info.radiation.global
+                radiation_value = result.game_info.radiation["global"]
         
         if radiation_value is None:
             await interaction.followup.send("Could not retrieve radiation information.")
