@@ -748,9 +748,9 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
             await interaction.followup.send(f"Nation '{nation_name}' is not in an alliance.")
             return
         
-        # Query bank records
+        # Query bank records - UPDATED to use "bankrecs" instead of "banks"
         bank_query = kit.query(
-            "banks",
+            "bankrecs",  # Changed from "banks" to "bankrecs"
             {"alliance_id": alliance_id, "receiver_id": nation_id},
             "id", "date", "money", "coal", "oil", "uranium", "iron", "bauxite", "lead", "gasoline",
             "munitions", "steel", "aluminum", "food", 
@@ -760,9 +760,9 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
         
         bank_result = await bank_query.get_async()
         
-        # Handle list or empty result
-        banks = bank_result.banks
-        if not banks or (isinstance(banks, list) and len(banks) == 0):
+        # Handle list or empty result - UPDATED to use bankrecs
+        bankrecs = bank_result.bankrecs  # Changed from banks to bankrecs
+        if not bankrecs or (isinstance(bankrecs, list) and len(bankrecs) == 0):
             await interaction.followup.send(f"No bank records found for '{nation_name}'.")
             return
         
@@ -784,12 +784,12 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
         )
         
         # Process bank records (up to 5 most recent)
-        if isinstance(banks, list):
+        if isinstance(bankrecs, list):  # Changed from banks to bankrecs
             # Sort by date (most recent first)
-            banks.sort(key=lambda x: safe_get(x, "date", ""), reverse=True)
-            banks = banks[:5]  # Take up to 5 most recent
+            bankrecs.sort(key=lambda x: safe_get(x, "date", ""), reverse=True)
+            bankrecs = bankrecs[:5]  # Take up to 5 most recent
             
-            for bank in banks:
+            for bank in bankrecs:  # Changed from banks to bankrecs
                 date = safe_get(bank, "date")
                 sender = safe_get(bank, "sender")
                 sender_name = safe_get(sender, "nation_name", "Unknown")
@@ -823,26 +823,26 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
                 embed.add_field(name=f"Transaction #{safe_get(bank, 'id')}", value=bank_info, inline=False)
         else:
             # Handle single bank record case
-            date = safe_get(banks, "date")
-            sender = safe_get(banks, "sender")
+            date = safe_get(bankrecs, "date")  # Changed from banks to bankrecs
+            sender = safe_get(bankrecs, "sender")  # Changed from banks to bankrecs
             sender_name = safe_get(sender, "nation_name", "Unknown")
             
             # Resources
             resources = []
-            money = safe_get(banks, "money")
+            money = safe_get(bankrecs, "money")  # Changed from banks to bankrecs
             if money and float(money) != 0:
                 resources.append(f"${format_number(money)}")
             
             for resource in ["coal", "oil", "uranium", "iron", "bauxite", "lead",
                              "gasoline", "munitions", "steel", "aluminum", "food"]:
-                amount = safe_get(banks, resource)
+                amount = safe_get(bankrecs, resource)  # Changed from banks to bankrecs
                 if amount and float(amount) != 0:
                     resources.append(f"{format_number(amount)} {resource.capitalize()}")
             
             resource_text = ", ".join(resources) if resources else "None"
             
             # Note
-            note = safe_get(banks, "note", "")
+            note = safe_get(bankrecs, "note", "")  # Changed from banks to bankrecs
             if note:
                 note = f"\nNote: {note}"
             
@@ -853,7 +853,7 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
                 f"{note}"
             )
             
-            embed.add_field(name=f"Transaction #{safe_get(banks, 'id')}", value=bank_info, inline=False)
+            embed.add_field(name=f"Transaction #{safe_get(bankrecs, 'id')}", value=bank_info, inline=False)  # Changed from banks to bankrecs
         
         await interaction.followup.send(embed=embed)
     except Exception as e:
@@ -861,8 +861,6 @@ async def bank_command(interaction: discord.Interaction, nation_name: str):
         print(f"Debug - Bank command error: {error_message}")
         await interaction.followup.send(error_message)
 
-
-# Radiation command
 async def radiation_command(interaction: discord.Interaction):
     await interaction.response.defer()
     
@@ -871,7 +869,7 @@ async def radiation_command(interaction: discord.Interaction):
         query = kit.query(
             "game_info",
             {},
-            pnwkit.Field("radiation", {}, "global")
+            "radiation"  # Changed to directly query radiation
         )
         
         result = await query.get_async()
@@ -881,18 +879,11 @@ async def radiation_command(interaction: discord.Interaction):
             await interaction.followup.send("Could not retrieve radiation information.")
             return
         
-        # Access the radiation data safely using dictionary-style access for the reserved keyword
+        # Access the radiation data
         radiation_value = None
         if hasattr(result.game_info, "radiation"):
-            radiation_value = getattr(result.game_info.radiation, "global", None)
+            radiation_value = result.game_info.radiation
             
-            # If that doesn't work, try dictionary access
-            if radiation_value is None:
-                try:
-                    radiation_value = result.game_info.radiation["global"]
-                except (KeyError, TypeError):
-                    pass
-        
         if radiation_value is None:
             await interaction.followup.send("Could not retrieve radiation information.")
             return
@@ -933,7 +924,7 @@ async def radiation_command(interaction: discord.Interaction):
     except Exception as e:
         error_message = f"Error looking up radiation: {str(e)}"
         print(f"Debug - Radiation command error: {error_message}")
-        await interaction.followup.send(error_message)
+        await interaction.followup.send(f"Error looking up radiation: {str(e)}")
 
 
 # Set API key command
