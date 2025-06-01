@@ -82,20 +82,22 @@ class PnWCommands(app_commands.Group):
     def __init__(self):
         super().__init__(name="pnw", description="Politics & War commands")
     
-# Nation command
 async def nation_command(interaction: discord.Interaction, nation_name: str):
     await interaction.response.defer()
     
     try:
-        # Query nation data using the correct syntax
+        # Query nation data with expanded fields
         query = kit.query(
             "nations",
             {"first": 1, "nation_name": nation_name},
             "id", "nation_name", "leader_name", "alliance_id", "alliance_position",
             pnwkit.Field("alliance", {}, "id", "name", "acronym"),
-            pnwkit.Field("cities", {}, "id", "name"),  # Specify which city fields you want
-            "score", "color", "vacation_mode_turns",
-            "last_active", "soldiers", "tanks", "aircraft", "ships", "missiles", "nukes"
+            pnwkit.Field("cities", {}, "id", "name"),
+            "score", "color", "vacation_mode_turns", "flag", "founded",
+            "last_active", "soldiers", "tanks", "aircraft", "ships", "missiles", "nukes",
+            "discord", "treasures", "continent", "war_policy", "domestic_policy",
+            "population", "gdp", "money", "coal", "oil", "uranium", "iron", "bauxite", "lead",
+            "gasoline", "munitions", "steel", "aluminum", "food"
         )
             
         result = await query.get_async()
@@ -114,6 +116,11 @@ async def nation_command(interaction: discord.Interaction, nation_name: str):
             url=f"https://politicsandwar.com/nation/id={safe_get(nation, 'id', '0')}",
             color=discord.Color.blue()
         )
+        
+        # Set flag as thumbnail if available
+        flag_url = safe_get(nation, "flag")
+        if flag_url:
+            embed.set_thumbnail(url=flag_url)
             
         # Basic info
         leader_name = safe_get(nation, "leader_name", "Unknown")
@@ -145,19 +152,46 @@ async def nation_command(interaction: discord.Interaction, nation_name: str):
         embed.add_field(name="Score", value=score, inline=True)
         embed.add_field(name="Cities", value=str(city_count), inline=True)
             
-        # Color
+        # Color and Continent
         color = safe_get(nation, "color", "None")
+        continent = safe_get(nation, "continent", "Unknown")
         embed.add_field(name="Color", value=color, inline=True)
+        embed.add_field(name="Continent", value=continent, inline=True)
+        
+        # Policies
+        war_policy = safe_get(nation, "war_policy", "Unknown")
+        domestic_policy = safe_get(nation, "domestic_policy", "Unknown")
+        embed.add_field(name="War Policy", value=war_policy, inline=True)
+        embed.add_field(name="Domestic Policy", value=domestic_policy, inline=True)
             
         # Activity
         last_active = safe_get(nation, "last_active", "Unknown")
         vacation_mode = safe_get(nation, "vacation_mode_turns", 0)
+        founded = safe_get(nation, "founded", "Unknown")
             
         activity = time_since(last_active)
         if vacation_mode and int(vacation_mode) > 0:
             activity += f" (Vacation Mode: {vacation_mode} turns)"
             
         embed.add_field(name="Last Active", value=activity, inline=True)
+        embed.add_field(name="Founded", value=time_since(founded), inline=True)
+        
+        # Population and GDP
+        population = safe_get(nation, "population", 0)
+        gdp = safe_get(nation, "gdp", 0)
+        embed.add_field(name="Population", value=format_number(population), inline=True)
+        embed.add_field(name="GDP", value=f"${format_number(gdp)}", inline=True)
+        
+        # Discord
+        discord_tag = safe_get(nation, "discord", "Not provided")
+        if discord_tag:
+            embed.add_field(name="Discord", value=discord_tag, inline=True)
+            
+        # Treasures
+        treasures = safe_get(nation, "treasures", [])
+        if treasures and len(treasures) > 0:
+            treasure_text = ", ".join(treasures) if isinstance(treasures, list) else treasures
+            embed.add_field(name="National Treasures", value=treasure_text, inline=False)
             
         # Military
         military = (
@@ -170,12 +204,46 @@ async def nation_command(interaction: discord.Interaction, nation_name: str):
         )
             
         embed.add_field(name="Military", value=military, inline=False)
+        
+        # Resources
+        resources = []
+        
+        # Money
+        money = safe_get(nation, "money", 0)
+        if money and float(money) > 0:
+            resources.append(f"Money: ${format_number(money)}")
+        
+        # Raw resources
+        for resource in ["coal", "oil", "uranium", "iron", "bauxite", "lead"]:
+            amount = safe_get(nation, resource, 0)
+            if amount and float(amount) > 0:
+                resources.append(f"{resource.capitalize()}: {format_number(amount)}")
+        
+        # Manufactured resources
+        for resource in ["gasoline", "munitions", "steel", "aluminum", "food"]:
+            amount = safe_get(nation, resource, 0)
+            if amount and float(amount) > 0:
+                resources.append(f"{resource.capitalize()}: {format_number(amount)}")
+        
+        if resources:
+            embed.add_field(name="Resources", value="\n".join(resources), inline=False)
+        
+        # City list
+        if cities and len(cities) > 0:
+            city_names = [safe_get(city, "name", "Unknown") for city in cities]
+            city_list = ", ".join(city_names[:10])  # Show first 10 cities
+            
+            if len(cities) > 10:
+                city_list += f" and {len(cities) - 10} more"
+                
+            embed.add_field(name="Cities", value=city_list, inline=False)
             
         await interaction.followup.send(embed=embed)
     except Exception as e:
         error_message = f"Error looking up nation: {str(e)}"
         print(f"Debug - Nation command error: {error_message}")
         await interaction.followup.send(error_message)
+
 
 # Alliance command with pagination
 async def alliance_command(interaction: discord.Interaction, alliance_name: str):
