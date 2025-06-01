@@ -980,83 +980,85 @@ async def radiation_command(interaction: discord.Interaction):
     await interaction.response.defer()
     
     try:
-        # Query radiation with proper sub-selection
+        # Query radiation with all continent fields
         query = kit.query(
             "game_info",
             {},
-            pnwkit.Field("radiation", {}, "global")  # Specify the sub-field "global"
+            pnwkit.Field("radiation", {}, 
+                "global", "north_america", "south_america", "europe", 
+                "africa", "asia", "australia"
+            )
         )
         
         result = await query.get_async()
         
-        # Debug the result structure
-        print(f"Radiation result: {result}")
-        if hasattr(result, "game_info"):
-            print(f"Game info: {result.game_info}")
-            if hasattr(result.game_info, "radiation"):
-                print(f"Radiation: {result.game_info.radiation}")
-        
         # Handle empty result
-        if not result or not hasattr(result, "game_info"):
+        if not result or not hasattr(result, "game_info") or not hasattr(result.game_info, "radiation"):
             await interaction.followup.send("Could not retrieve radiation information.")
             return
         
-        # Access the radiation data safely
-        radiation_value = None
-        
-        # Try different ways to access the data
-        try:
-            if hasattr(result.game_info, "radiation"):
-                # Try direct attribute access
-                if hasattr(result.game_info.radiation, "global"):
-                    radiation_value = result.game_info.radiation["global"]
-                # Try dictionary-style access
-                elif hasattr(result.game_info.radiation, "__getitem__"):
-                    radiation_value = result.game_info.radiation["global"]
-        except Exception as e:
-            print(f"Error accessing radiation data: {e}")
-        
-        # If still None, try another approach
-        if radiation_value is None:
-            try:
-                # Try to convert to dictionary
-                game_info_dict = vars(result.game_info)
-                if "radiation" in game_info_dict:
-                    radiation_dict = vars(game_info_dict["radiation"])
-                    if "global" in radiation_dict:
-                        radiation_value = radiation_dict["global"]
-            except Exception as e:
-                print(f"Error converting to dict: {e}")
-        
-        if radiation_value is None:
-            await interaction.followup.send("Could not retrieve radiation information. Please try again later.")
-            return
+        # Access the radiation data
+        radiation = result.game_info.radiation
         
         # Create embed
         embed = discord.Embed(
             title="Global Radiation Levels",
-            description=f"Current global radiation: {radiation_value}%",
-            color=discord.Color.green() if float(radiation_value) < 15 else discord.Color.red()
+            description="Radiation levels across the world",
+            color=discord.Color.green()
         )
+        
+        # Add global radiation
+        global_rad = safe_get(radiation, "global", 0)
+        embed.add_field(
+            name="Global Average", 
+            value=f"**{global_rad}%**", 
+            inline=False
+        )
+        
+        # Add continent radiation levels
+        continents = [
+            ("North America", "north_america"),
+            ("South America", "south_america"),
+            ("Europe", "europe"),
+            ("Africa", "africa"),
+            ("Asia", "asia"),
+            ("Australia", "australia")
+        ]
+        
+        for continent_name, field_name in continents:
+            rad_value = safe_get(radiation, field_name, 0)
+            # Set color based on radiation level
+            color = "🟢"  # Low radiation
+            if rad_value >= 50:
+                color = "🔴"  # High radiation
+            elif rad_value >= 25:
+                color = "🟠"  # Medium radiation
+            elif rad_value >= 10:
+                color = "🟡"  # Slight radiation
+                
+            embed.add_field(
+                name=continent_name, 
+                value=f"{color} **{rad_value}%**", 
+                inline=True
+            )
         
         # Add effects based on radiation level
         effects = []
-        rad_value = float(radiation_value)
         
-        if rad_value < 15:
+        if global_rad < 15:
             effects.append("No significant effects")
-        if rad_value >= 15:
+        if global_rad >= 15:
             effects.append("15%+ : -1% Population Growth")
-        if rad_value >= 30:
+        if global_rad >= 30:
             effects.append("30%+ : -2% Population Growth")
-        if rad_value >= 50:
+        if global_rad >= 50:
             effects.append("50%+ : -3% Population Growth")
-        if rad_value >= 75:
+        if global_rad >= 75:
             effects.append("75%+ : -4% Population Growth")
-        if rad_value >= 100:
+        if global_rad >= 100:
             effects.append("100%+ : -5% Population Growth")
         
-        embed.add_field(name="Effects", value="\n".join(effects), inline=False)
+        embed.add_field(name="Global Effects", value="\n".join(effects), inline=False)
         
         # Add information about radiation decay
         embed.add_field(
@@ -1076,6 +1078,7 @@ async def radiation_command(interaction: discord.Interaction):
         print(f"Traceback: {traceback_str}")
         
         await interaction.followup.send(f"Error looking up radiation: {str(e)}")
+
 
 # Set API key command
 async def set_api_key_command(interaction: discord.Interaction, api_key: str):
