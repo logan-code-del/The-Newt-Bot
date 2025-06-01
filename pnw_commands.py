@@ -873,16 +873,47 @@ async def radiation_command(interaction: discord.Interaction):
         
         result = await query.get_async()
         
+        # Debug the result structure
+        print(f"Radiation result: {result}")
+        if hasattr(result, "game_info"):
+            print(f"Game info: {result.game_info}")
+            if hasattr(result.game_info, "radiation"):
+                print(f"Radiation: {result.game_info.radiation}")
+        
         # Handle empty result
-        if not result or not hasattr(result, "game_info") or not hasattr(result.game_info, "radiation"):
+        if not result or not hasattr(result, "game_info"):
             await interaction.followup.send("Could not retrieve radiation information.")
             return
         
-        # Access the radiation data
-        radiation_value = result.game_info.radiation.global
+        # Access the radiation data safely
+        radiation_value = None
+        
+        # Try different ways to access the data
+        try:
+            if hasattr(result.game_info, "radiation"):
+                # Try direct attribute access
+                if hasattr(result.game_info.radiation, "global"):
+                    radiation_value = result.game_info.radiation.global
+                # Try dictionary-style access
+                elif hasattr(result.game_info.radiation, "__getitem__"):
+                    radiation_value = result.game_info.radiation["global"]
+        except Exception as e:
+            print(f"Error accessing radiation data: {e}")
+        
+        # If still None, try another approach
+        if radiation_value is None:
+            try:
+                # Try to convert to dictionary
+                game_info_dict = vars(result.game_info)
+                if "radiation" in game_info_dict:
+                    radiation_dict = vars(game_info_dict["radiation"])
+                    if "global" in radiation_dict:
+                        radiation_value = radiation_dict["global"]
+            except Exception as e:
+                print(f"Error converting to dict: {e}")
         
         if radiation_value is None:
-            await interaction.followup.send("Could not retrieve radiation information.")
+            await interaction.followup.send("Could not retrieve radiation information. Please try again later.")
             return
         
         # Create embed
@@ -922,6 +953,12 @@ async def radiation_command(interaction: discord.Interaction):
     except Exception as e:
         error_message = f"Error looking up radiation: {str(e)}"
         print(f"Debug - Radiation command error: {error_message}")
+        
+        # Add more detailed error information
+        import traceback
+        traceback_str = traceback.format_exc()
+        print(f"Traceback: {traceback_str}")
+        
         await interaction.followup.send(f"Error looking up radiation: {str(e)}")
 
 # Set API key command
