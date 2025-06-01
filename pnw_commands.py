@@ -180,17 +180,21 @@ async def nation_command(interaction: discord.Interaction, nation_name: str):
         await interaction.followup.send(error_message)
 
 
-# Alliance command
+# Alliance command with pagination
 async def alliance_command(interaction: discord.Interaction, alliance_name: str):
     await interaction.response.defer()
     
     try:
-        # Query the alliance data using the correct syntax
+        # Query the alliance data with nations
         query = kit.query(
             "alliances", 
             {"first": 1, "name": alliance_name},
-            "id", "name", "acronym", "score", "color", "rank", "nations", 
-            "average_score", "discord_link", "flag"
+            "id", "name", "acronym", "score", "color", "rank", 
+            "nations_count", "average_score", "discord_link", "flag",
+            pnwkit.Field("nations", {}, 
+                "id", "nation_name", "leader_name", "score", "cities", 
+                "vacation_mode_turns", "color", "last_active"
+            )
         )
         
         result = await query.get_async()
@@ -203,7 +207,53 @@ async def alliance_command(interaction: discord.Interaction, alliance_name: str)
         
         alliance = alliances[0] if isinstance(alliances, list) else alliances
         
-        # Create embed
+        # Get nations list
+        nations = safe_get(alliance, "nations", [])
+        if isinstance(nations, dict):
+            nations = [nations]
+        
+        # Sort nations by score (descending)
+        nations.sort(key=lambda x: float(safe_get(x, "score", 0)), reverse=True)
+        
+        # Create paginator
+        paginator = AlliancePaginator(interaction, alliance, nations)
+        await paginator.start()
+        
+    except Exception as e:
+        error_message = f"Error looking up alliance: {str(e)}"
+        print(f"Debug - Alliance command error: {error_message}")
+        await interaction.followup.send(error_message)
+
+# Alliance Paginator class
+class AlliancePaginator(discord.ui.View):
+    def __init__(self, interaction, alliance, nations, timeout=180):
+        super().__init__(timeout=timeout)
+        self.interaction = interaction
+        self.alliance = alliance
+        self.nations = nations
+        self.current_page = 0
+        self.nations_per_page = 10
+        self.max_pages = 1 + (len(nations) + self.nations_per_page - 1) // self.nations_per_page  # Overview + nation pages
+        self.message = None
+    
+    async def start(self):
+        """Send the initial message with the paginator"""
+        embed = self.get_current_page_embed()
+        self.message = await self.interaction.followup.send(embed=embed, view=self)
+    
+    def get_current_page_embed(self):
+        """Generate the embed for the current page"""
+        if self.current_page == 0:
+            # Overview page
+            return self.get_overview_embed()
+        else:
+            # Nation list pages
+            return self.get_nations_page_embed()
+    
+    def get_overview_embed(self):
+        """Generate the alliance overview embed"""
+        alliance = self.alliance
+        
         embed = discord.Embed(
             title=f"{safe_get(alliance, 'name')} [{safe_get(alliance, 'acronym')}]",
             url=f"https://politicsandwar.com/alliance/id={safe_get(alliance, 'id')}",
@@ -219,20 +269,102 @@ async def alliance_command(interaction: discord.Interaction, alliance_name: str)
         embed.add_field(name="Score", value=format_number(safe_get(alliance, "score")), inline=True)
         embed.add_field(name="Rank", value=safe_get(alliance, "rank"), inline=True)
         embed.add_field(name="Color", value=safe_get(alliance, "color"), inline=True)
-        embed.add_field(name="Nations", value=safe_get(alliance, "nations"), inline=True)
+        embed.add_field(name="Nations", value=safe_get(alliance, "nations_count"), inline=True)
         embed.add_field(name="Average Score", value=format_number(safe_get(alliance, "average_score")), inline=True)
         
         # Discord link if available
-        discord_link = safe_get(alliance, "discord")
+        discord_link = safe_get(alliance, "discord_link")
         if discord_link:
             embed.add_field(name="Discord", value=discord_link, inline=False)
         
-        await interaction.followup.send(embed=embed)
-    except Exception as e:
-        error_message = f"Error looking up alliance: {str(e)}"
-        print(f"Debug - Alliance command error: {error_message}")
-        await interaction.followup.send(error_message)
-
+        embed.set_footer(text=f"Page 1/{self.max_pages} • Overview • Use buttons to navigate")
+        return embed
+    
+    def get_nations_page_embed(self):
+        """Generate the nations list embed for the current page"""
+        alliance = self.alliance
+        
+        # Calculate which nations to show on this page
+        start_idx = (self.current_page - 1) * self.nations_per_page
+        end_idx = min(start_idx + self.nations_per_page, len(self.nations))
+        page_nations = self.nations[start_idx:end_idx]
+        
+        embed = discord.Embed(
+            title=f"{safe_get(alliance, 'name')} [{safe_get(alliance, 'acronym')}] - Nations",
+            url=f"https://politicsandwar.com/alliance/id={safe_get(alliance, 'id')}",
+            color=discord.Color.green()
+        )
+        
+        # Add each nation to the embed
+        for nation in page_nations:
+            nation_name = safe_get(nation, "nation_name")
+            nation_id = safe_get(nation, "id")
+            leader_name = safe_get(nation, "leader_name")
+            score = format_number(safe_get(nation, "score"))
+            cities = safe_get(nation, "cities")
+            city_count = len(cities) if isinstance(cities, list) else cities
+            
+            # Check vacation mode
+            vacation = safe_get(nation, "vacation_mode_turns")
+            vacation_text = f" (VM: {vacation})" if vacation and int(vacation) > 0 else ""
+            
+            # Last active
+            last_active = safe_get(nation, "last_active")
+            activity = time_since(last_active) if last_active else "Unknown"
+            
+            nation_info = (
+                f"Leader: {leader_name}\n"
+                f"Score: {score}\n"
+                f"Cities: {city_count}\n"
+                f"Last Active: {activity}{vacation_text}"
+            )
+            
+            embed.add_field(
+                name=f"{nation_name}",
+                value=nation_info,
+                inline=True
+            )
+        
+        embed.set_footer(text=f"Page {self.current_page + 1}/{self.max_pages} • Nations {start_idx + 1}-{end_idx} of {len(self.nations)}")
+        return embed
+    
+    @discord.ui.button(label="◀️ Previous", style=discord.ButtonStyle.gray)
+    async def previous_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        
+        if self.current_page > 0:
+            self.current_page -= 1
+            await self.update_message()
+    
+    @discord.ui.button(label="Overview", style=discord.ButtonStyle.blurple)
+    async def overview_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        
+        self.current_page = 0
+        await self.update_message()
+    
+    @discord.ui.button(label="Next ▶️", style=discord.ButtonStyle.gray)
+    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        await interaction.response.defer()
+        
+        if self.current_page < self.max_pages - 1:
+            self.current_page += 1
+            await self.update_message()
+    
+    async def update_message(self):
+        """Update the message with the current page"""
+        embed = self.get_current_page_embed()
+        await self.message.edit(embed=embed, view=self)
+    
+    async def on_timeout(self):
+        """Disable buttons when the view times out"""
+        for item in self.children:
+            item.disabled = True
+        
+        try:
+            await self.message.edit(view=self)
+        except:
+            pass
 
 # War command
 async def wars_command(interaction: discord.Interaction, nation_name: str):
