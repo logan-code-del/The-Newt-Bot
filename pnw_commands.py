@@ -105,7 +105,7 @@ async def nation_command(interaction: discord.Interaction, nation_name: str):
             "last_active", "soldiers", "tanks", "aircraft", "ships", "missiles", "nukes"
         )
         
-        result = await query.get()
+        result = await query.get_async()
         
         # Handle list or empty result
         nations = result.nations
@@ -200,7 +200,7 @@ async def alliance_command(interaction: discord.Interaction, alliance_name: str)
             "average_score", "discord", "flag"
         )
         
-        result = await query.get()
+        result = await query.get_async()
         
         # Handle list or empty result
         alliances = result.alliances
@@ -253,7 +253,7 @@ async def wars_command(interaction: discord.Interaction, nation_name: str):
             "id", "nation_name"
         )
         
-        nation_result = await nation_query.get()
+        nation_result = await nation_query.get_async()
         
         # Handle list or empty result
         nations = nation_result.nations
@@ -277,7 +277,7 @@ async def wars_command(interaction: discord.Interaction, nation_name: str):
             "air_superiority", "naval_blockade", "winner", "turns_left"
         )
         
-        war_result = await war_query.get()
+        war_result = await war_query.get_async()
         
         # Handle list or empty result
         wars = war_result.wars
@@ -395,7 +395,7 @@ async def city_command(interaction: discord.Interaction, nation_name: str, city_
             )
         )
         
-        nation_result = await nation_query.get()
+        nation_result = await nation_query.get_async()
         
         # Handle list or empty result
         nations = nation_result.nations
@@ -542,7 +542,7 @@ async def prices_command(interaction: discord.Interaction):
             "gasoline", "munitions", "steel", "aluminum", "food", "credits"
         )
         
-        result = await query.get()
+        result = await query.get_async()
         
         # Handle empty result
         if not result.tradeprices:
