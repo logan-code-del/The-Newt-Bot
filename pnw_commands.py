@@ -528,7 +528,7 @@ async def city_command(interaction: discord.Interaction, nation_name: str, city_
         error_message = f"Error looking up city: {str(e)}"
         print(f"Debug - City command error: {error_message}")
         await interaction.followup.send(error_message)
-        
+
 # Prices command
 async def prices_command(interaction: discord.Interaction):
     await interaction.response.defer()
@@ -740,7 +740,7 @@ async def radiation_command(interaction: discord.Interaction):
     await interaction.response.defer()
     
     try:
-        # Query global data using the correct syntax
+        # Query radiation using the correct syntax
         query = kit.query(
             "game_info",
             {},
@@ -749,48 +749,57 @@ async def radiation_command(interaction: discord.Interaction):
         
         result = await query.get()
         
-        if not result.game_info or not result.game_info.radiation:
-            await interaction.followup.send("Could not retrieve radiation data.")
+        # Handle empty result
+        if not result or not hasattr(result, "game_info"):
+            await interaction.followup.send("Could not retrieve radiation information.")
             return
         
-        # Get the radiation value
-        radiation = result.game_info.radiation.global
+        # Access the radiation data safely
+        radiation_value = None
+        if hasattr(result.game_info, "radiation"):
+            if hasattr(result.game_info.radiation, "global"):
+                radiation_value = result.game_info.radiation.global
+        
+        if radiation_value is None:
+            await interaction.followup.send("Could not retrieve radiation information.")
+            return
         
         # Create embed
         embed = discord.Embed(
             title="Global Radiation Levels",
-            description=f"Current global radiation: **{radiation}%**",
-            color=discord.Color.dark_purple()
+            description=f"Current global radiation: {radiation_value}%",
+            color=discord.Color.green() if radiation_value < 15 else discord.Color.red()
         )
         
         # Add effects based on radiation level
-        effects = ""
-        try:
-            radiation_value = float(radiation)
-            if radiation_value < 1:
-                effects = "No significant effects."
-            elif radiation_value < 10:
-                effects = "Minor reduction in food production."
-            elif radiation_value < 25:
-                effects = "Moderate reduction in food production and population growth."
-            elif radiation_value < 50:
-                effects = "Significant reduction in food production, population growth, and soldier recruitment."
-            elif radiation_value < 75:
-                effects = "Severe reduction in food production, population growth, and soldier recruitment. Increased casualties in war."
-            else:
-                effects = "Catastrophic reduction in food production, population growth, and soldier recruitment. Greatly increased casualties in war."
-        except (ValueError, TypeError):
-            effects = "Unable to determine effects due to data format issues."
+        effects = []
         
-        embed.add_field(name="Effects", value=effects, inline=False)
+        if radiation_value < 15:
+            effects.append("No significant effects")
+        if radiation_value >= 15:
+            effects.append("15%+ : -1% Population Growth")
+        if radiation_value >= 30:
+            effects.append("30%+ : -2% Population Growth")
+        if radiation_value >= 50:
+            effects.append("50%+ : -3% Population Growth")
+        if radiation_value >= 75:
+            effects.append("75%+ : -4% Population Growth")
+        if radiation_value >= 100:
+            effects.append("100%+ : -5% Population Growth")
+        
+        embed.add_field(name="Effects", value="\n".join(effects), inline=False)
+        
+        # Add information about radiation decay
+        embed.add_field(
+            name="Radiation Decay",
+            value="Global radiation decreases by 1% every 12 hours.",
+            inline=False
+        )
         
         await interaction.followup.send(embed=embed)
     except Exception as e:
         error_message = f"Error looking up radiation: {str(e)}"
         print(f"Debug - Radiation command error: {error_message}")
-        # Print full traceback for debugging
-        import traceback
-        print(traceback.format_exc())
         await interaction.followup.send(error_message)
 
 
