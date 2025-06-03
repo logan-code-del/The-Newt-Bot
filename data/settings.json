@@ -6,6 +6,11 @@
             "hello_count": 1,
             "theme_color": "#abc0e9",
             "uptime_checks": 1
+        },
+        "1379152392754430224": {
+            "joined_at": "2025-06-03T18:16:46.504909",
+            "name": "Chess Tournament",
+            "member_count": 8
         }
     }
 }
