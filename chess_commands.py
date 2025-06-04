@@ -26,13 +26,41 @@ matches = {"matches": {}}
 tickets = {"tickets": {}}
 
 # Load data from files
-def load_data(file_path, default_data):
+def load_data():
+    """Load data from JSON files"""
+    global tournaments, matches, players, tickets
+    
+    # Load tournaments
     try:
-        with open(file_path, 'r') as f:
-            return json.load(f)
+        with open(TOURNAMENTS_FILE, 'r') as f:
+            tournaments = json.load(f)
     except (FileNotFoundError, json.JSONDecodeError):
-        save_data(file_path, default_data)
-        return default_data
+        tournaments = {"tournaments": {}}
+        save_data(TOURNAMENTS_FILE, tournaments)
+    
+    # Load matches
+    try:
+        with open(MATCHES_FILE, 'r') as f:
+            matches = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        matches = {"matches": {}}
+        save_data(MATCHES_FILE, matches)
+    
+    # Load players
+    try:
+        with open(PLAYERS_FILE, 'r') as f:
+            players = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        players = {"players": {}}
+        save_data(PLAYERS_FILE, players)
+    
+    # Load tickets
+    try:
+        with open(TICKETS_FILE, 'r') as f:
+            tickets = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        tickets = {"tickets": {}}
+        save_data(TICKETS_FILE, tickets)
 
 # Save data to files
 def save_data(file_path, data):
