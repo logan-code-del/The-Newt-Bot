@@ -11,18 +11,18 @@ from typing import Optional, List, Dict, Any
 
 # File paths for data storage
 DATA_DIR = "data"
-TOURNAMENTS_FILE = os.path.join(DATA_DIR, "tournaments.json")
-PLAYERS_FILE = os.path.join(DATA_DIR, "players.json")
-MATCHES_FILE = os.path.join(DATA_DIR, "matches.json")
-TICKETS_FILE = os.path.join(DATA_DIR, "match_tickets.json")
+TOURNAMENTS_FILE = 'data/chess/tournaments.json'
+MATCHES_FILE = 'data/chess/matches.json'
+PLAYERS_FILE = 'data/chess/players.json'
+TICKETS_FILE = 'data/chess/tickets.json'
 
 # Ensure data directory exists
 os.makedirs(DATA_DIR, exist_ok=True)
 
 # Initialize data structures
 tournaments = {"tournaments": {}}
-players = {"players": {}}
 matches = {"matches": {}}
+players = {"players": {}}
 tickets = {"tickets": {}}
 
 # Load data from files
@@ -68,10 +68,10 @@ def save_data(file_path, data):
         json.dump(data, f, indent=4)
 
 # Load all data
-tournaments = load_data(TOURNAMENTS_FILE, tournaments)
-players = load_data(PLAYERS_FILE, players)
-matches = load_data(MATCHES_FILE, matches)
-tickets = load_data(TICKETS_FILE, tickets)
+#tournaments = load_data(TOURNAMENTS_FILE, tournaments)
+#players = load_data(PLAYERS_FILE, players)
+#matches = load_data(MATCHES_FILE, matches)
+#tickets = load_data(TICKETS_FILE, tickets)
 
 # Generate a unique ID
 def generate_id(prefix):
