@@ -8,6 +8,7 @@ import asyncio
 import discord
 import pnw_commands
 import chess_commands
+import chess_activity
 from discord import app_commands
 from discord.ext import commands
 
@@ -131,6 +132,10 @@ async def setup_hook():
     # Register Chess Tournament commands
     chess_commands.setup(bot)
     
+    # Register Chess Activity integration
+    chess_activity.setup(bot)
+    chess_activity.initialize(bot)
+    
     # Sync commands with Discord
     try:
         print("Syncing commands with Discord...")
@@ -145,7 +150,6 @@ async def setup_hook():
     # Log to file
     with open('data/bot_log.txt', 'a') as f:
         f.write(f'[{current_time}] Bot is setting up...\n')
-
 
 @bot.event
 async def on_ready():
