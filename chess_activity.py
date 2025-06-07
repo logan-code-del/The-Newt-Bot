@@ -560,32 +560,23 @@ async def setup_activity_listeners(bot):
                         pass
 
 # Function to modify the MatchControlPanel to include the chess game button
-def add_chess_button_to_match_panel():
-    """Add the chess game button to the match control panel"""
-    import chess_commands
-    
-    # Store the original __init__ method
-    original_init = chess_commands.MatchControlPanel.__init__
-    
-    # Define a new __init__ method that adds our button
-    def new_init(self, match_id):
-        original_init(self, match_id)
-        self.add_item(ChessGameButton(match_id))
-    
-    # Replace the original __init__ method
-    chess_commands.MatchControlPanel.__init__ = new_init
+v
 
 # Function to initialize the chess activity system
 def initialize(bot):
     """Initialize the chess activity system"""
-    # Create the chess activity manager
-    bot.chess_activity_manager = ChessActivityManager(bot)
-    
-    # Set up activity listeners
-    asyncio.create_task(setup_activity_listeners(bot))
-    
-    # Add the chess button to match panels
-    add_chess_button_to_match_panel()
-    
-    # Log initialization
-    print("Chess activity system initialized")
+    try:
+        # Create the chess activity manager
+        bot.chess_activity_manager = ChessActivityManager(bot)
+        
+        # Set up activity listeners
+        asyncio.create_task(setup_activity_listeners(bot))
+        
+        # Try to add the chess button to match panels
+        add_chess_button_to_match_panel()
+        
+        # Log initialization
+        print("Chess activity system initialized")
+    except Exception as e:
+        print(f"Error initializing chess activity system: {e}")
+        # Continue anyway to not block the bot from starting
