@@ -19,13 +19,36 @@ class ChessActivityManager:
     async def create_chess_activity(self, match_id, player1_id, player2_id, tournament_id=None):
         """Create a new chess activity for a match"""
         try:
-            # Get player objects
-            guild = self.bot.guilds[0]  # Use the first guild the bot is in (you might want to change this)
-            player1 = await guild.fetch_member(int(player1_id))
-            player2 = await guild.fetch_member(int(player2_id))
+            # Get player objects - with better error handling
+            guild = None
             
-            if not player1 or not player2:
-                return False, "Could not find one or both players"
+            # Find a guild where both players are members
+            for g in self.bot.guilds:
+                try:
+                    # Try to get both members from this guild
+                    player1 = await g.fetch_member(int(player1_id))
+                    player2 = await g.fetch_member(int(player2_id))
+                    
+                    if player1 and player2:
+                        guild = g
+                        break
+                except discord.errors.NotFound:
+                    # One or both members not in this guild, try the next one
+                    continue
+            
+            # If we couldn't find both players in any guild
+            if not guild:
+                # Try to get player names from the match data
+                import chess_commands
+                player1_name = "Player 1"
+                player2_name = "Player 2"
+                
+                if match_id in chess_commands.matches["matches"]:
+                    match = chess_commands.matches["matches"][match_id]
+                    player1_name = match.get("player1_name", "Player 1")
+                    player2_name = match.get("player2_name", "Player 2")
+                
+                return False, f"Could not find players in any shared server. Make sure both {player1_name} and {player2_name} are in the same server as the bot."
             
             # Create or get the live games channel
             live_games_channel = None
@@ -61,12 +84,15 @@ class ChessActivityManager:
             self.match_channels[match_id] = live_games_channel.id
             
             # Create an invite to the activity
-            invite = await live_games_channel.create_invite(
-                max_age=86400,  # 24 hours
-                max_uses=0,
-                target_application_id=CHESS_ACTIVITY_ID,
-                target_type=discord.InviteTarget.embedded_application
-            )
+            try:
+                invite = await live_games_channel.create_invite(
+                    max_age=86400,  # 24 hours
+                    max_uses=0,
+                    target_application_id=CHESS_ACTIVITY_ID,
+                    target_type=discord.InviteTarget.embedded_application
+                )
+            except Exception as e:
+                return False, f"Failed to create activity invite: {str(e)}"
             
             # Store the active game
             self.active_games[match_id] = {
@@ -95,15 +121,19 @@ class ChessActivityManager:
             embed.add_field(name="Started At", value=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), inline=True)
             
             # Send the embed to the live-games channel
-            message = await live_games_channel.send(
-                content=f"{player1.mention} {player2.mention} Your chess match is ready!",
-                embed=embed
-            )
-            
-            # Add the invite button
-            view = discord.ui.View()
-            view.add_item(discord.ui.Button(label="Join Chess Game", url=invite.url, style=discord.ButtonStyle.url))
-            await message.edit(view=view)
+            try:
+                message = await live_games_channel.send(
+                    content=f"{player1.mention} {player2.mention} Your chess match is ready!",
+                    embed=embed
+                )
+                
+                # Add the invite button
+                view = discord.ui.View()
+                view.add_item(discord.ui.Button(label="Join Chess Game", url=invite.url, style=discord.ButtonStyle.url))
+                await message.edit(view=view)
+            except Exception as e:
+                print(f"Error sending match message: {e}")
+                # Continue even if this fails
             
             # DM both players with the invite
             try:
@@ -122,15 +152,25 @@ class ChessActivityManager:
                 dm_view = discord.ui.View()
                 dm_view.add_item(discord.ui.Button(label="Join Chess Game", url=invite.url, style=discord.ButtonStyle.url))
                 
-                await player1.send(embed=dm_embed, view=dm_view)
-                await player2.send(embed=dm_embed, view=dm_view)
-            except:
+                try:
+                    await player1.send(embed=dm_embed, view=dm_view)
+                except:
+                    print(f"Could not DM player 1 ({player1.display_name})")
+                
+                try:
+                    await player2.send(embed=dm_embed, view=dm_view)
+                except:
+                    print(f"Could not DM player 2 ({player2.display_name})")
+            except Exception as e:
+                print(f"Error sending DMs: {e}")
                 # Continue even if DMs fail
-                pass
             
             return True, invite.url
             
         except Exception as e:
+            import traceback
+            traceback_str = traceback.format_exc()
+            print(f"Chess activity error: {traceback_str}")
             return False, f"Failed to create chess activity: {str(e)}"
     
     async def end_chess_activity(self, match_id, winner_id=None, result="draw"):
