@@ -1,3 +1,30 @@
 {
-    "players": {}
+    "players": {
+        "1350167835283816578": {
+            "id": "1350167835283816578",
+            "username": "Doomforte",
+            "rating": 1200,
+            "tier": "Beginner",
+            "tournaments": [
+                "T20250607195327A4GF"
+            ],
+            "matches": [],
+            "wins": 0,
+            "losses": 0,
+            "draws": 0
+        },
+        "1380996568446013633": {
+            "id": "1380996568446013633",
+            "username": "Doom",
+            "rating": 1200,
+            "tier": "Beginner",
+            "tournaments": [
+                "T20250607195327A4GF"
+            ],
+            "matches": [],
+            "wins": 0,
+            "losses": 0,
+            "draws": 0
+        }
+    }
 }
