@@ -42,6 +42,8 @@ settings = load_settings()
 # Set up intents
 intents = discord.Intents.default()
 intents.message_content = True  # Enable message content intent
+intents.members = True  # Enable members intent - important for fetching members
+intents.presences = True  # Enable presences intent - needed for activity tracking
 
 # Create bot with intents
 bot = commands.Bot(command_prefix="!", intents=intents, help_command=None)
