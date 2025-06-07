@@ -560,7 +560,29 @@ async def setup_activity_listeners(bot):
                         pass
 
 # Function to modify the MatchControlPanel to include the chess game button
-v
+def add_chess_button_to_match_panel():
+    """Add the chess game button to the match control panel"""
+    import chess_commands
+    
+    # Check if MatchControlPanel exists
+    if not hasattr(chess_commands, 'MatchControlPanel'):
+        print("Warning: MatchControlPanel not found in chess_commands module. Chess button will not be added to match panels.")
+        return
+    
+    try:
+        # Store the original __init__ method
+        original_init = chess_commands.MatchControlPanel.__init__
+        
+        # Define a new __init__ method that adds our button
+        def new_init(self, match_id):
+            original_init(self, match_id)
+            self.add_item(ChessGameButton(match_id))
+        
+        # Replace the original __init__ method
+        chess_commands.MatchControlPanel.__init__ = new_init
+        print("Successfully added chess button to match control panel")
+    except Exception as e:
+        print(f"Error adding chess button to match control panel: {e}")
 
 # Function to initialize the chess activity system
 def initialize(bot):
